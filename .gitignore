@@ -1,0 +1,28 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Go build output
+/bin/
+*.exe
+*.out
+
+# Go test cache
+*.test
+
+# Dependency vendor directory (if not vendoring)
+vendor/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Air live reload (if used)
+tmp/
