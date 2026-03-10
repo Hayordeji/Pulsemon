@@ -1,4 +1,4 @@
-# 🟢 Service Reliability Monitor
+# 🟢 Pulsemon
 
 A production-grade, multi-tenant backend system built in Go that continuously probes HTTP/HTTPS endpoints, tracks latency histograms, monitors SLA compliance, inspects SSL certificates, and delivers email alerts when things go wrong.
 
@@ -6,7 +6,7 @@ A production-grade, multi-tenant backend system built in Go that continuously pr
 
 ## What It Does
 
-Service Reliability Monitor watches your HTTP/HTTPS services so you don't have to. Register an endpoint, choose a probe interval, and the system takes care of the rest — probing on schedule, recording results, detecting failures, and alerting you before your users notice something is wrong.
+Pulsemon watches your HTTP/HTTPS services so you don't have to. Register an endpoint, choose a probe interval, and the system takes care of the rest — probing on schedule, recording results, detecting failures, and alerting you before your users notice something is wrong.
 
 ---
 
@@ -44,7 +44,7 @@ Service Reliability Monitor watches your HTTP/HTTPS services so you don't have t
 ## Project Structure
 
 ```
-service-reliability-monitor/
+pulsemon/
 │
 ├── cmd/
 │   └── api/
@@ -110,8 +110,7 @@ service-reliability-monitor/
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/yourusername/service-reliability-monitor.git
-cd service-reliability-monitor
+git clone https://github.com/hayordeji/pulsemon.git
 ```
 
 **2. Install dependencies**
@@ -128,7 +127,7 @@ Open `.env` and fill in your values (see Environment Variables section below).
 
 **4. Create the PostgreSQL database**
 ```bash
-createdb service_monitor
+createdb pulsemon
 ```
 
 **5. Run the application**
@@ -216,33 +215,6 @@ Authorization: Bearer <jwt_token>
 - **Alert cooldown** is 30 minutes — no repeated alerts within that window
 - All service routes return `404` for both missing and unauthorized resources — other users' data is never revealed
 
----
-
-## Concurrency Model
-
-```
-Main Goroutine
-  └── Initialises DB → starts Scheduler → starts API server
-
-Scheduler
-  └── Per active service → spawns Ticker goroutine
-        └── Every tick → sends ProbeJob to Worker Pool via channel
-
-Worker Pool (configurable N goroutines)
-  └── Each worker listens on jobs channel
-        └── Runs HTTP/HTTPS probe + SSL inspection
-        └── Sends ProbeResult to results channel
-
-Result Processor
-  └── Single goroutine listening on results channel
-        └── Stores result → updates streak → recalculates SLA → checks alerts
-
-Alert Engine
-  └── Called from Result Processor
-        └── Checks cooldown → sends email via Resend → records alert
-```
-
----
 
 ## Alert Types
 
@@ -255,18 +227,7 @@ Alert Engine
 
 ---
 
-## Scaling Notes
 
-This system runs as a **single binary** — appropriate for a side project or small production deployment. The module boundaries are clean enough to support future scaling:
-
-```
-Today:   Single Go binary — all modules in one process
-Future:  Scheduler publishes to a message queue (Redis / RabbitMQ)
-         Workers run as separate horizontally scalable consumers
-         API runs as stateless instances behind a load balancer
-```
-
----
 
 ## License
 
@@ -276,4 +237,4 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ## Author
 
-Built by [Your Name](https://github.com/yourusername) as a platform engineering learning project.
+Built by Ayodeji Shoga (https://github.com/hayordeji) as a side project.

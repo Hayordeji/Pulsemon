@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 
 	"github.com/joho/godotenv"
 )
@@ -20,7 +22,15 @@ type Config struct {
 
 func Load() Config {
 
-	_ = godotenv.Load()
+	// go up two levels to reach project root
+	_, filename, _, _ := runtime.Caller(0)
+	projectRoot := filepath.Dir(filepath.Dir(filepath.Dir(filename)))
+	envPath := filepath.Join(projectRoot, ".env")
+
+	err := godotenv.Load(envPath)
+	if err != nil {
+		panic("Error loading .env file")
+	}
 	return Config{
 		DBHost:       os.Getenv("DB_HOST"),
 		DBPort:       os.Getenv("DB_PORT"),
