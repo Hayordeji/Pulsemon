@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
+	"log"
+
+	"Pulsemon/internal/scheduler"
 	"Pulsemon/internal/services"
 	"Pulsemon/pkg/config"
 	"Pulsemon/pkg/database"
-	"log"
 
 	"github.com/gin-gonic/gin"
 )
@@ -30,16 +33,26 @@ func main() {
 	}
 	log.Println("database connected and migrations applied successfully")
 
-	//Register services, repositories and handlers
+	// Create channels
+	jobs := make(chan scheduler.ProbeJob, 100)
+
+	// Create scheduler
+	sched := scheduler.NewScheduler(db, jobs)
+
+	// Register services, repositories and handlers
 	repo := services.NewServiceRepository(db)
-	svc := services.NewServiceService(repo)
+	svc := services.NewServiceService(repo, sched.Events())
 	handler := services.NewServiceHandler(svc)
 
+	// Start scheduler in background
+	ctx := context.Background()
+	go sched.Start(ctx)
+
+	// Start Gin router
 	router := gin.Default()
 	handler.RegisterRoutes(router)
 
-	//Run server
+	// Run server
 	log.Printf("server starting on port %s", cfg.ServerPort)
 	router.Run(":" + cfg.ServerPort)
-
 }
