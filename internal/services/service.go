@@ -49,12 +49,13 @@ type UpdateServiceInput struct {
 
 // ServiceService encapsulates business logic for service management.
 type ServiceService struct {
-	repo *ServiceRepository
+	repo   *ServiceRepository
+	events chan ServiceEvent
 }
 
 // NewServiceService creates a new ServiceService.
-func NewServiceService(repo *ServiceRepository) *ServiceService {
-	return &ServiceService{repo: repo}
+func NewServiceService(repo *ServiceRepository, events chan ServiceEvent) *ServiceService {
+	return &ServiceService{repo: repo, events: events}
 }
 
 // CreateService validates the input, enforces the per-user service limit, and
@@ -99,6 +100,13 @@ func (s *ServiceService) CreateService(userID string, input CreateServiceInput) 
 
 	if err := s.repo.Create(service); err != nil {
 		return nil, err
+	}
+
+	// Notify the scheduler that a new service was created.
+	s.events <- ServiceEvent{
+		Type:      ServiceCreated,
+		ServiceID: service.ID.String(),
+		Interval:  service.Interval,
 	}
 
 	return service, nil
@@ -166,5 +174,16 @@ func (s *ServiceService) DeleteService(serviceID string, userID string) error {
 	if service == nil {
 		return ErrServiceNotFound
 	}
-	return s.repo.Delete(serviceID, userID)
+
+	if err := s.repo.Delete(serviceID, userID); err != nil {
+		return err
+	}
+
+	// Notify the scheduler that a service was deleted.
+	s.events <- ServiceEvent{
+		Type:      ServiceDeleted,
+		ServiceID: serviceID,
+	}
+
+	return nil
 }
