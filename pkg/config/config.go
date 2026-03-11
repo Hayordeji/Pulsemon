@@ -21,7 +21,6 @@ type Config struct {
 }
 
 func Load() Config {
-
 	// go up two levels to reach project root
 	_, filename, _, _ := runtime.Caller(0)
 	projectRoot := filepath.Dir(filepath.Dir(filepath.Dir(filename)))
@@ -47,6 +46,6 @@ func RequireEnv(key string) {
 
 	v := os.Getenv(key)
 	if v == "" {
-		panic(fmt.Sprintf("Missing environment variable: " + key))
+		panic(fmt.Sprintf("%s", "Missing environment variable: "+key))
 	}
 }
