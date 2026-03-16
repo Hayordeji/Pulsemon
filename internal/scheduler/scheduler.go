@@ -13,8 +13,6 @@ import (
 )
 
 // ProbeJob carries everything a worker needs to execute a single probe.
-// Defined here because the Scheduler owns the contract between itself and
-// the Worker Pool.
 type ProbeJob struct {
 	ServiceID      string
 	UserID         string
