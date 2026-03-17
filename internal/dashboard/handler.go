@@ -18,7 +18,7 @@ func NewDashboardHandler(repo *DashboardRepository) *DashboardHandler {
 }
 
 // RegisterRoutes wires up all dashboard-related routes on the given router.
-func (h *DashboardHandler) RegisterRoutes(router *gin.Engine) {
+func (h *DashboardHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/dashboard/:service_id", h.GetDashboard)
 	router.GET("/dashboard/:service_id/alerts", h.GetServiceAlerts)
 }
@@ -29,6 +29,16 @@ func getUserID(c *gin.Context) string {
 }
 
 // GetDashboard handles GET /dashboard/:service_id.
+// @Summary      Get service health dashboard
+// @Description  Returns full health overview including latency, SLA, SSL and recent probes
+// @Tags         dashboard
+// @Produce      json
+// @Security     BearerAuth
+// @Param        service_id  path      string  true  "Service ID"
+// @Success      200         {object}  DashboardResponse
+// @Failure      401         {object}  map[string]string
+// @Failure      404         {object}  map[string]string
+// @Router       /dashboard/{service_id} [get]
 func (h *DashboardHandler) GetDashboard(c *gin.Context) {
 	userID := getUserID(c)
 	if userID == "" {
@@ -73,6 +83,16 @@ func (h *DashboardHandler) GetDashboard(c *gin.Context) {
 }
 
 // GetServiceAlerts handles GET /dashboard/:service_id/alerts.
+// @Summary      Get service alert history
+// @Description  Returns all alerts sent for a specific service
+// @Tags         dashboard
+// @Produce      json
+// @Security     BearerAuth
+// @Param        service_id  path      string  true  "Service ID"
+// @Success      200         {object}  ServiceAlertsResponse
+// @Failure      401         {object}  map[string]string
+// @Failure      404         {object}  map[string]string
+// @Router       /dashboard/{service_id}/alerts [get]
 func (h *DashboardHandler) GetServiceAlerts(c *gin.Context) {
 	userID := getUserID(c)
 	if userID == "" {

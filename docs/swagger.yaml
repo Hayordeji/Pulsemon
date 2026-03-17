@@ -1,0 +1,561 @@
+basePath: /
+definitions:
+  auth.LoginInput:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  auth.RegisterInput:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  dashboard.AlertResponse:
+    properties:
+      alert_type:
+        type: string
+      id:
+        type: string
+      message:
+        type: string
+      sent_at:
+        type: string
+    type: object
+  dashboard.DashboardResponse:
+    properties:
+      avg_latency_ms:
+        type: number
+      current_status:
+        type: string
+      failure_streak:
+        type: integer
+      last_checked_at:
+        type: string
+      name:
+        type: string
+      p95_latency_ms:
+        type: number
+      p99_latency_ms:
+        type: number
+      pagination:
+        $ref: '#/definitions/dashboard.PaginationMeta'
+      recent_results:
+        items:
+          $ref: '#/definitions/dashboard.RecentResultResponse'
+        type: array
+      service_id:
+        type: string
+      sla_breached:
+        type: boolean
+      sla_target:
+        type: number
+      ssl:
+        $ref: '#/definitions/dashboard.SSLStatusResponse'
+      uptime_percentage:
+        type: number
+    type: object
+  dashboard.PaginationMeta:
+    properties:
+      has_more:
+        type: boolean
+      next_cursor:
+        type: string
+    type: object
+  dashboard.RecentResultResponse:
+    properties:
+      checked_at:
+        type: string
+      is_success:
+        type: boolean
+      latency_ms:
+        type: number
+      status_code:
+        type: integer
+    type: object
+  dashboard.SSLStatusResponse:
+    properties:
+      cert_expiry:
+        type: string
+      cert_valid:
+        type: boolean
+      days_remaining:
+        type: integer
+      expiry_warning:
+        type: boolean
+    type: object
+  dashboard.ServiceAlertsResponse:
+    properties:
+      alerts:
+        items:
+          $ref: '#/definitions/dashboard.AlertResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/dashboard.PaginationMeta'
+      service_id:
+        type: string
+    type: object
+  services.CreateServiceInput:
+    properties:
+      expected_status:
+        type: integer
+      interval:
+        type: string
+      name:
+        type: string
+      sla_target:
+        type: number
+      timeout_seconds:
+        type: integer
+      url:
+        type: string
+    type: object
+  services.CreateServiceResponse:
+    properties:
+      created_at:
+        type: string
+      current_status:
+        type: string
+      expected_status:
+        type: integer
+      id:
+        type: string
+      interval:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      sla_target:
+        type: number
+      timeout_seconds:
+        type: integer
+      url:
+        type: string
+    type: object
+  services.SSLInfoResponse:
+    properties:
+      cert_expiry:
+        type: string
+      cert_issuer:
+        type: string
+      cert_valid:
+        type: boolean
+      days_remaining:
+        type: integer
+      expiry_warning:
+        type: boolean
+    type: object
+  services.ServiceDetailResponse:
+    properties:
+      avg_latency_ms:
+        type: number
+      created_at:
+        type: string
+      current_status:
+        type: string
+      expected_status:
+        type: integer
+      failure_streak:
+        type: integer
+      id:
+        type: string
+      interval:
+        type: string
+      is_active:
+        type: boolean
+      last_checked_at:
+        type: string
+      name:
+        type: string
+      p95_latency_ms:
+        type: number
+      p99_latency_ms:
+        type: number
+      sla_percentage:
+        type: number
+      sla_target:
+        type: number
+      ssl:
+        $ref: '#/definitions/services.SSLInfoResponse'
+      successful_checks:
+        type: integer
+      timeout_seconds:
+        type: integer
+      total_checks:
+        type: integer
+      url:
+        type: string
+    type: object
+  services.ServiceSummaryResponse:
+    properties:
+      current_status:
+        type: string
+      id:
+        type: string
+      interval:
+        type: string
+      last_checked_at:
+        type: string
+      name:
+        type: string
+      sla_percentage:
+        type: number
+      url:
+        type: string
+    type: object
+  services.UpdateServiceInput:
+    properties:
+      expected_status:
+        type: integer
+      interval:
+        type: string
+      name:
+        type: string
+      sla_target:
+        type: number
+      timeout_seconds:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: A multi-tenant backend that probes HTTP/HTTPS endpoints,
+  title: Pulsemon
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user and returns a JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.LoginInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account with email and password
+      parameters:
+      - description: Registration details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.RegisterInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register a new user account
+      tags:
+      - auth
+  /dashboard/{service_id}:
+    get:
+      description: Returns full health overview including latency, SLA, SSL and recent
+        probes
+      parameters:
+      - description: Service ID
+        in: path
+        name: service_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dashboard.DashboardResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get service health dashboard
+      tags:
+      - dashboard
+  /dashboard/{service_id}/alerts:
+    get:
+      description: Returns all alerts sent for a specific service
+      parameters:
+      - description: Service ID
+        in: path
+        name: service_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dashboard.ServiceAlertsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get service alert history
+      tags:
+      - dashboard
+  /services:
+    get:
+      description: Returns a summary list of all services for the logged-in user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/services.ServiceSummaryResponse'
+              type: array
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all services
+      tags:
+      - services
+    post:
+      consumes:
+      - application/json
+      description: Registers a new HTTP/HTTPS endpoint to monitor
+      parameters:
+      - description: Service configuration
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/services.CreateServiceInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/services.CreateServiceResponse'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a new service
+      tags:
+      - services
+  /services/{id}:
+    delete:
+      description: Permanently deletes a service and all its probe history
+      parameters:
+      - description: Service ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a service
+      tags:
+      - services
+    get:
+      description: Returns full details of a single service including latency and
+        SSL info
+      parameters:
+      - description: Service ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/services.ServiceDetailResponse'
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get service details
+      tags:
+      - services
+    put:
+      consumes:
+      - application/json
+      description: Updates service configuration. URL cannot be changed.
+      parameters:
+      - description: Service ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated configuration
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/services.UpdateServiceInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update a service
+      tags:
+      - services
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and your JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

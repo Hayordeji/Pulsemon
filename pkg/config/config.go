@@ -16,11 +16,12 @@ type Config struct {
 	DBUser         string
 	DBPassword     string
 	DBName         string
-	ServerPort     string
-	JWTSecret      string
+	ServerPort      string
+	JWTSecret       string
 	ResendAPIKey    string
 	ResendFromEmail string
 	WorkerPoolSize  int
+	AppEnv          string
 }
 
 func Load() Config {
@@ -49,6 +50,7 @@ func Load() Config {
 		ResendAPIKey:    os.Getenv("RESEND_API_KEY"),
 		ResendFromEmail: os.Getenv("RESEND_FROM_EMAIL"),
 		WorkerPoolSize:  workerPoolSize,
+		AppEnv:          os.Getenv("APP_ENV"),
 	}
 }
 
