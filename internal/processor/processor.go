@@ -93,7 +93,7 @@ func (p *Processor) process(ctx context.Context, result worker.ProbeResult) {
 		ServiceID: result.ServiceID,
 		UserID:    result.UserID,
 		AlertType: "ssl_expiry",
-		Message:   fmt.Sprintf("SSL certificate expires in %d days", *result.DaysRemaining),
+		Message:   fmt.Sprintf("SSL certificate expires in %d days", &result.DaysRemaining),
 	}
 
 	if err := p.db.Create(&probeResult).Error; err != nil {
@@ -115,7 +115,7 @@ func (p *Processor) process(ctx context.Context, result worker.ProbeResult) {
 		service.CurrentStatus = "up"
 
 		if previousStreak >= 3 {
-			alertInput.AlertType = "recovery"
+			alertInput.AlertType = string(models.AlertTypeRecovery)
 			alertInput.Message = "Service has recovered after a failure streak"
 			if err := p.alerter.SendAlert(ctx, alertInput); err != nil {
 				slog.Error("processor: failed to send recovery alert for service %s: %v", result.ServiceID, err)
@@ -126,7 +126,7 @@ func (p *Processor) process(ctx context.Context, result worker.ProbeResult) {
 		service.CurrentStatus = "down"
 
 		if service.FailureStreak >= 3 {
-			alertInput.AlertType = "failure_streak"
+			alertInput.AlertType = string(models.AlertTypeFailureStreak)
 			alertInput.Message = fmt.Sprintf("Service has failed %d consecutive times", service.FailureStreak)
 			if err := p.alerter.SendAlert(ctx, alertInput); err != nil {
 				slog.Error("processor: failed to send failure streak alert for service %s: %v", result.ServiceID, err)
@@ -144,7 +144,7 @@ func (p *Processor) process(ctx context.Context, result worker.ProbeResult) {
 		service.SLAPercentage = (float64(service.SuccessfulChecks) / float64(service.TotalChecks)) * 100
 
 		if service.SLAPercentage < service.SLATarget {
-			alertInput.AlertType = "sla_breach"
+			alertInput.AlertType = string(models.AlertTypeSLA_Breach)
 			alertInput.Message = fmt.Sprintf("SLA breach: current %.2f%% is below target %.2f%%", service.SLAPercentage, service.SLATarget)
 
 			if err := p.alerter.SendAlert(ctx, alertInput); err != nil {
@@ -189,7 +189,7 @@ func (p *Processor) process(ctx context.Context, result worker.ProbeResult) {
 		service.SSLDaysRemaining = result.DaysRemaining
 
 		if result.DaysRemaining != nil && *result.DaysRemaining < 30 {
-			alertInput.AlertType = "ssl_expiry"
+			alertInput.AlertType = string(models.AlertTypeSSL_Expiry)
 			alertInput.Message = fmt.Sprintf("SSL certificate expires in %d days", *result.DaysRemaining)
 			if err := p.alerter.SendAlert(ctx, alertInput); err != nil {
 				slog.Error("processor: failed to send SSL expiry alert for service %s: %v", result.ServiceID, err)

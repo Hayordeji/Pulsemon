@@ -13,3 +13,13 @@ type ServiceStructResponse struct {
 	Error   string
 	Success bool
 }
+
+type AlertType string
+
+const (
+	AlertTypeUnknown       AlertType = ""
+	AlertTypeRecovery      AlertType = "recovery"
+	AlertTypeFailureStreak AlertType = "failure_streak"
+	AlertTypeSLA_Breach    AlertType = "sla_breach"
+	AlertTypeSSL_Expiry    AlertType = "ssl_expiry"
+)
