@@ -62,7 +62,7 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) error {
 
 	err = s.repo.CreateUser(CreateUserInput{
 		ID:           uuid.New(),
-		Email:        input.Email,
+		Email:        strings.ToLower(input.Email),
 		PasswordHash: string(hashedPassword),
 	})
 	if err != nil {
@@ -89,10 +89,10 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (string, erro
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": user.ID.String(),
-		"email":   user.Email,
-		"exp":     time.Now().Add(24 * time.Hour).Unix(),
-		"iat":     time.Now().Unix(),
+		"userID": user.ID.String(),
+		"email":  user.Email,
+		"exp":    time.Now().Add(24 * time.Hour).Unix(),
+		"iat":    time.Now().Unix(),
 	})
 
 	tokenString, err := token.SignedString([]byte(s.jwtSecret))

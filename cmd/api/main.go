@@ -35,12 +35,13 @@ import (
 //	tracks latency, monitors SLA compliance, inspects SSL
 //	certificates, and sends email alerts.
 //
+// @securityDefinitions.apikey BearerAuth
 // @host            localhost:8080
 // @BasePath        /
 // @securityDefinitions.apikey BearerAuth
 // @in              header
 // @name            Authorization
-// @description     Type "Bearer" followed by a space and your JWT token.
+// @description     JWT token.
 func main() {
 	//set slog as default logger
 	logger := slog.New(tint.NewHandler(os.Stderr, &tint.Options{
@@ -123,12 +124,12 @@ func main() {
 	//Unprotected Routes
 	v1 := router.Group("/api/v1")
 	{
-		dashboardHandler.RegisterRoutes(v1)
 		authHandler.RegisterRoutes(v1)
 	}
 	//Protected Routes
-	api := router.Group("/api/v1", middleware.AuthMiddleware("my-secret-key"))
+	api := router.Group("/api/v1", middleware.AuthMiddleware(cfg.JWTSecret))
 	{
+		dashboardHandler.RegisterRoutes(api)
 		handler.RegisterRoutes(api)
 	}
 

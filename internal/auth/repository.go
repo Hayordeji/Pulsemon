@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"strings"
 
 	"Pulsemon/pkg/models"
 
@@ -45,7 +46,7 @@ type FindUserByEmailInput struct {
 // FindUserByEmail retrieves a user by their email address.
 func (r *AuthRepository) FindUserByEmail(input FindUserByEmailInput) (*models.User, error) {
 	var user models.User
-	err := r.db.Where("email = ?", input.Email).First(&user).Error
+	err := r.db.Where("email = ?", strings.ToLower(input.Email)).First(&user).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil // Return nil, nil if not found

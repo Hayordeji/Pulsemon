@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"Pulsemon/pkg/models"
 	"errors"
 	"net/http"
 
@@ -42,21 +43,33 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	res := models.ApiResponse{
+		Message: "Registration failed",
+		Success: false,
+		Error:   "",
+		Data:    nil,
+	}
+
 	err := h.svc.Register(c.Request.Context(), input)
 	if err != nil {
 		if errors.Is(err, ErrEmailAlreadyExists) {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			res.Error = err.Error()
+			c.JSON(http.StatusConflict, gin.H{"response": res})
 			return
 		}
 		if err.Error() == "invalid email format" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			res.Error = err.Error()
+			c.JSON(http.StatusBadRequest, gin.H{"response": res})
 			return
 		}
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Registration successful"})
+	res.Success = true
+	res.Message = "Registration successful"
+	c.JSON(http.StatusCreated, gin.H{"response": res})
 }
 
 // Login handles POST /auth/login.
@@ -77,15 +90,26 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	res := models.ApiResponse{
+		Message: "Login failed",
+		Success: false,
+		Error:   "",
+		Data:    nil,
+	}
+
 	token, err := h.svc.Login(c.Request.Context(), input)
 	if err != nil {
 		if errors.Is(err, ErrInvalidCredentials) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			res.Error = err.Error()
+			c.JSON(http.StatusUnauthorized, gin.H{"response": res})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	res.Success = true
+	res.Message = "Login successful"
+	res.Data = token
+	c.JSON(http.StatusOK, gin.H{"response": res})
 }

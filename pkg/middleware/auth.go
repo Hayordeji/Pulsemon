@@ -45,7 +45,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		userID, ok1 := claims["user_id"].(string)
+		userID, ok1 := claims["userID"].(string)
 		email, ok2 := claims["email"].(string)
 
 		if !ok1 || !ok2 {

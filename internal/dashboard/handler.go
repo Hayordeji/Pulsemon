@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"Pulsemon/pkg/models"
 	"log/slog"
 	"net/http"
 
@@ -25,7 +26,11 @@ func (h *DashboardHandler) RegisterRoutes(router *gin.RouterGroup) {
 
 // getUserID extracts the user identity from the X-User-ID header.
 func getUserID(c *gin.Context) string {
-	return c.GetHeader("X-User-ID")
+	userID, exists := c.Get("userID")
+	if !exists {
+		return ""
+	}
+	return userID.(string)
 }
 
 // GetDashboard handles GET /dashboard/:service_id.
@@ -46,6 +51,13 @@ func (h *DashboardHandler) GetDashboard(c *gin.Context) {
 		return
 	}
 
+	res := models.ApiResponse{
+		Message: "Get Dashboard Failed",
+		Success: false,
+		Error:   "",
+		Data:    nil,
+	}
+
 	serviceID := c.Param("service_id")
 	pagination := ParsePaginationParams(c)
 
@@ -58,11 +70,13 @@ func (h *DashboardHandler) GetDashboard(c *gin.Context) {
 		slog.Error("failed to fetch service for dashboard",
 			"service_id", serviceID,
 			"error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		res.Error = err.Error()
+		c.JSON(http.StatusInternalServerError, gin.H{"response": res})
 		return
 	}
 	if service == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "service not found"})
+		res.Error = "Service not found"
+		c.JSON(http.StatusNotFound, gin.H{"response": res})
 		return
 	}
 
@@ -75,11 +89,15 @@ func (h *DashboardHandler) GetDashboard(c *gin.Context) {
 		slog.Error("failed to fetch probe results for dashboard",
 			"service_id", serviceID,
 			"error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		res.Error = err.Error()
+		c.JSON(http.StatusInternalServerError, gin.H{"response": res})
 		return
 	}
 
-	c.JSON(http.StatusOK, ToDashboardResponse(*service, results, pagination.Limit))
+	res.Message = "Dashboard retrieved successfully"
+	res.Data = ToDashboardResponse(*service, results, pagination.Limit)
+	res.Success = true
+	c.JSON(http.StatusOK, gin.H{"response": res})
 }
 
 // GetServiceAlerts handles GET /dashboard/:service_id/alerts.
@@ -100,6 +118,13 @@ func (h *DashboardHandler) GetServiceAlerts(c *gin.Context) {
 		return
 	}
 
+	res := models.ApiResponse{
+		Message: "Get Service Alerts Failed",
+		Success: false,
+		Error:   "",
+		Data:    nil,
+	}
+
 	serviceID := c.Param("service_id")
 	pagination := ParsePaginationParams(c)
 
@@ -112,11 +137,13 @@ func (h *DashboardHandler) GetServiceAlerts(c *gin.Context) {
 		slog.Error("failed to fetch service for alerts",
 			"service_id", serviceID,
 			"error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		res.Error = err.Error()
+		c.JSON(http.StatusInternalServerError, gin.H{"response": res})
 		return
 	}
 	if service == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "service not found"})
+		res.Error = "Service not found"
+		c.JSON(http.StatusNotFound, gin.H{"response": res})
 		return
 	}
 
@@ -130,9 +157,13 @@ func (h *DashboardHandler) GetServiceAlerts(c *gin.Context) {
 		slog.Error("failed to fetch alerts for service",
 			"service_id", serviceID,
 			"error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		res.Error = err.Error()
+		c.JSON(http.StatusInternalServerError, gin.H{"response": res})
 		return
 	}
 
-	c.JSON(http.StatusOK, ToServiceAlertsResponse(serviceID, alertsList, pagination.Limit))
+	res.Message = "Service alerts retrieved successfully"
+	res.Data = ToServiceAlertsResponse(serviceID, alertsList, pagination.Limit)
+	res.Success = true
+	c.JSON(http.StatusOK, gin.H{"response": res})
 }
