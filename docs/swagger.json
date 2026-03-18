@@ -1,0 +1,863 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "A multi-tenant backend that probes HTTP/HTTPS endpoints,",
+        "title": "Pulsemon",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/auth/login": {
+            "post": {
+                "description": "Authenticates a user and returns a JWT token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Login",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.LoginInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/register": {
+            "post": {
+                "description": "Creates a new user account with email and password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Register a new user account",
+                "parameters": [
+                    {
+                        "description": "Registration details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.RegisterInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/dashboard/{service_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns full health overview including latency, SLA, SSL and recent probes",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dashboard"
+                ],
+                "summary": "Get service health dashboard",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Service ID",
+                        "name": "service_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dashboard.DashboardResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/dashboard/{service_id}/alerts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all alerts sent for a specific service",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dashboard"
+                ],
+                "summary": "Get service alert history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Service ID",
+                        "name": "service_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dashboard.ServiceAlertsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/services": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a summary list of all services for the logged-in user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "services"
+                ],
+                "summary": "List all services",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/definitions/services.ServiceSummaryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Registers a new HTTP/HTTPS endpoint to monitor",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "services"
+                ],
+                "summary": "Create a new service",
+                "parameters": [
+                    {
+                        "description": "Service configuration",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/services.CreateServiceInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "$ref": "#/definitions/services.CreateServiceResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/services/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns full details of a single service including latency and SSL info",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "services"
+                ],
+                "summary": "Get service details",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Service ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "$ref": "#/definitions/services.ServiceDetailResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates service configuration. URL cannot be changed.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "services"
+                ],
+                "summary": "Update a service",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Service ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated configuration",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/services.UpdateServiceInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Permanently deletes a service and all its probe history",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "services"
+                ],
+                "summary": "Delete a service",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Service ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "auth.LoginInput": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "auth.RegisterInput": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "dashboard.AlertResponse": {
+            "type": "object",
+            "properties": {
+                "alert_type": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "sent_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "dashboard.DashboardResponse": {
+            "type": "object",
+            "properties": {
+                "avg_latency_ms": {
+                    "type": "number"
+                },
+                "current_status": {
+                    "type": "string"
+                },
+                "failure_streak": {
+                    "type": "integer"
+                },
+                "last_checked_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "p95_latency_ms": {
+                    "type": "number"
+                },
+                "p99_latency_ms": {
+                    "type": "number"
+                },
+                "pagination": {
+                    "$ref": "#/definitions/dashboard.PaginationMeta"
+                },
+                "recent_results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dashboard.RecentResultResponse"
+                    }
+                },
+                "service_id": {
+                    "type": "string"
+                },
+                "sla_breached": {
+                    "type": "boolean"
+                },
+                "sla_target": {
+                    "type": "number"
+                },
+                "ssl": {
+                    "$ref": "#/definitions/dashboard.SSLStatusResponse"
+                },
+                "uptime_percentage": {
+                    "type": "number"
+                }
+            }
+        },
+        "dashboard.PaginationMeta": {
+            "type": "object",
+            "properties": {
+                "has_more": {
+                    "type": "boolean"
+                },
+                "next_cursor": {
+                    "type": "string"
+                }
+            }
+        },
+        "dashboard.RecentResultResponse": {
+            "type": "object",
+            "properties": {
+                "checked_at": {
+                    "type": "string"
+                },
+                "is_success": {
+                    "type": "boolean"
+                },
+                "latency_ms": {
+                    "type": "number"
+                },
+                "status_code": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dashboard.SSLStatusResponse": {
+            "type": "object",
+            "properties": {
+                "cert_expiry": {
+                    "type": "string"
+                },
+                "cert_valid": {
+                    "type": "boolean"
+                },
+                "days_remaining": {
+                    "type": "integer"
+                },
+                "expiry_warning": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "dashboard.ServiceAlertsResponse": {
+            "type": "object",
+            "properties": {
+                "alerts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dashboard.AlertResponse"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/dashboard.PaginationMeta"
+                },
+                "service_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.CreateServiceInput": {
+            "type": "object",
+            "properties": {
+                "expected_status": {
+                    "type": "integer"
+                },
+                "interval": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sla_target": {
+                    "type": "number"
+                },
+                "timeout_seconds": {
+                    "type": "integer"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.CreateServiceResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "current_status": {
+                    "type": "string"
+                },
+                "expected_status": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interval": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sla_target": {
+                    "type": "number"
+                },
+                "timeout_seconds": {
+                    "type": "integer"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.SSLInfoResponse": {
+            "type": "object",
+            "properties": {
+                "cert_expiry": {
+                    "type": "string"
+                },
+                "cert_issuer": {
+                    "type": "string"
+                },
+                "cert_valid": {
+                    "type": "boolean"
+                },
+                "days_remaining": {
+                    "type": "integer"
+                },
+                "expiry_warning": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "services.ServiceDetailResponse": {
+            "type": "object",
+            "properties": {
+                "avg_latency_ms": {
+                    "type": "number"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "current_status": {
+                    "type": "string"
+                },
+                "expected_status": {
+                    "type": "integer"
+                },
+                "failure_streak": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interval": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_checked_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "p95_latency_ms": {
+                    "type": "number"
+                },
+                "p99_latency_ms": {
+                    "type": "number"
+                },
+                "sla_percentage": {
+                    "type": "number"
+                },
+                "sla_target": {
+                    "type": "number"
+                },
+                "ssl": {
+                    "$ref": "#/definitions/services.SSLInfoResponse"
+                },
+                "successful_checks": {
+                    "type": "integer"
+                },
+                "timeout_seconds": {
+                    "type": "integer"
+                },
+                "total_checks": {
+                    "type": "integer"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.ServiceSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "current_status": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interval": {
+                    "type": "string"
+                },
+                "last_checked_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sla_percentage": {
+                    "type": "number"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.UpdateServiceInput": {
+            "type": "object",
+            "properties": {
+                "expected_status": {
+                    "type": "integer"
+                },
+                "interval": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sla_target": {
+                    "type": "number"
+                },
+                "timeout_seconds": {
+                    "type": "integer"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Type \"Bearer\" followed by a space and your JWT token.",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

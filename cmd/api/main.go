@@ -4,10 +4,12 @@ import (
 	"context"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
 	"time"
 
 	"Pulsemon/internal/alerts"
+	"Pulsemon/internal/auth"
 	"Pulsemon/internal/dashboard"
 	"Pulsemon/internal/processor"
 	"Pulsemon/internal/scheduler"
@@ -15,11 +17,31 @@ import (
 	"Pulsemon/internal/worker"
 	"Pulsemon/pkg/config"
 	"Pulsemon/pkg/database"
+	"Pulsemon/pkg/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lmittmann/tint"
+
+	docs "Pulsemon/docs"
+
+	swaggerfiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+// @title           Pulsemon
+// @version         1.0
+// @description     A multi-tenant backend that probes HTTP/HTTPS endpoints,
+//
+//	tracks latency, monitors SLA compliance, inspects SSL
+//	certificates, and sends email alerts.
+//
+// @securityDefinitions.apikey BearerAuth
+// @host            localhost:8080
+// @BasePath        /
+// @securityDefinitions.apikey BearerAuth
+// @in              header
+// @name            Authorization
+// @description     JWT token.
 func main() {
 	//set slog as default logger
 	logger := slog.New(tint.NewHandler(os.Stderr, &tint.Options{
@@ -67,6 +89,11 @@ func main() {
 	dashboardRepo := dashboard.NewDashboardRepository(db)
 	dashboardHandler := dashboard.NewDashboardHandler(dashboardRepo)
 
+	// Create auth services,repository and handler
+	authRepo := auth.NewAuthRepository(db)
+	authSvc := auth.NewAuthService(authRepo, cfg)
+	authHandler := auth.NewAuthHandler(authSvc)
+
 	// Create alert engine and processor
 	alertEngine := alerts.NewAlertEngine(db, cfg)
 	proc := processor.NewProcessor(db, results, alertEngine)
@@ -79,11 +106,47 @@ func main() {
 
 	// Start Gin router
 	router := gin.Default()
-	handler.RegisterRoutes(router)
-	dashboardHandler.RegisterRoutes(router)
+
+	//Setup  scalar
+	if cfg.AppEnv != "production" {
+		docs.SwaggerInfo.BasePath = "/api/v1"
+		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
+
+		// router.GET("/docs", openapiui.WrapHandler(openapiui.Config{
+		// 	SpecURL:      "/docs/swagger.json",
+		// 	SpecFilePath: "../docs/swagger.json",
+		// 	Title:        "Pulsemon API Documentation V1",
+		// 	Theme:        "dark", // or "light ... I prefer dark mode "
+		// }))
+		// router.Static("/docs/swagger.json", "../docs/swagger.json")
+	}
+
+	//Unprotected Routes
+	v1 := router.Group("/api/v1")
+	{
+		authHandler.RegisterRoutes(v1)
+	}
+	//Protected Routes
+	api := router.Group("/api/v1", middleware.AuthMiddleware(cfg.JWTSecret))
+	{
+		dashboardHandler.RegisterRoutes(api)
+		handler.RegisterRoutes(api)
+	}
 
 	// Run server
 	log.Printf("server starting on port %s", cfg.ServerPort)
 	router.Run(":" + cfg.ServerPort)
 }
 
+// PingExample godoc
+// @Summary ping example
+// @Schemes
+// @Description do ping
+// @Tags example
+// @Accept json
+// @Produce json
+// @Success 200 {string} Helloworld
+// @Router /example/helloworld [get]
+func Helloworld(g *gin.Context) {
+	g.JSON(http.StatusOK, "helloworld")
+}

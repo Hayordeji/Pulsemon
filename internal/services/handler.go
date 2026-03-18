@@ -1,6 +1,7 @@
 package services
 
 import (
+	"Pulsemon/pkg/models"
 	"errors"
 	"net/http"
 
@@ -17,14 +18,18 @@ func NewServiceHandler(svc *ServiceService) *ServiceHandler {
 	return &ServiceHandler{svc: svc}
 }
 
-// getUserID extracts the user identity from the X-User-ID header.
-// Returns an empty string if the header is missing.
+// getUserID extracts the user identity from the Gin context (set by JWT middleware).
+// Returns an empty string if the user identity is missing.
 func getUserID(c *gin.Context) string {
-	return c.GetHeader("X-User-ID")
+	userID, exists := c.Get("userID")
+	if !exists {
+		return ""
+	}
+	return userID.(string)
 }
 
 // RegisterRoutes wires up all service-related routes on the given router.
-func (h *ServiceHandler) RegisterRoutes(router *gin.Engine) {
+func (h *ServiceHandler) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/services", h.ListServices)
 	router.POST("/services", h.CreateService)
 	router.GET("/services/:id", h.GetService)
@@ -33,6 +38,18 @@ func (h *ServiceHandler) RegisterRoutes(router *gin.Engine) {
 }
 
 // CreateService handles POST /services.
+// @Summary      Create a new service
+// @Description  Registers a new HTTP/HTTPS endpoint to monitor
+// @Tags         services
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body body CreateServiceInput true "Service configuration"
+// @Success      201  {object}  map[string]CreateServiceResponse
+// @Failure      400  {object}  map[string]string
+// @Failure      401  {object}  map[string]string
+// @Failure      429  {object}  map[string]string
+// @Router       /services [post]
 func (h *ServiceHandler) CreateService(c *gin.Context) {
 	userID := getUserID(c)
 	if userID == "" {
@@ -40,9 +57,17 @@ func (h *ServiceHandler) CreateService(c *gin.Context) {
 		return
 	}
 
+	res := models.ApiResponse{
+		Message: "Create Service Failed",
+		Success: false,
+		Error:   "",
+		Data:    nil,
+	}
+
 	var input CreateServiceInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		res.Error = err.Error()
+		c.JSON(http.StatusBadRequest, gin.H{"response": res})
 		return
 	}
 
@@ -50,19 +75,33 @@ func (h *ServiceHandler) CreateService(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrServiceLimitReached):
-			c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+			res.Error = err.Error()
+			c.JSON(http.StatusTooManyRequests, gin.H{"response": res})
 		case errors.Is(err, ErrInvalidURL), errors.Is(err, ErrInvalidInterval):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			res.Error = err.Error()
+			c.JSON(http.StatusBadRequest, gin.H{"response": res})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			res.Error = err.Error()
+			c.JSON(http.StatusInternalServerError, gin.H{"response": res})
 		}
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"service": ToCreateServiceResponse(*service)})
+	res.Message = "Service created successfully"
+	res.Success = true
+	res.Data = &service
+	c.JSON(http.StatusCreated, gin.H{"response": res})
 }
 
 // ListServices handles GET /services.
+// @Summary      List all services
+// @Description  Returns a summary list of all services for the logged-in user
+// @Tags         services
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  map[string][]ServiceSummaryResponse
+// @Failure      401  {object}  map[string]string
+// @Router       /services [get]
 func (h *ServiceHandler) ListServices(c *gin.Context) {
 	userID := getUserID(c)
 	if userID == "" {
@@ -70,9 +109,17 @@ func (h *ServiceHandler) ListServices(c *gin.Context) {
 		return
 	}
 
+	res := models.ApiResponse{
+		Message: "Get Services Failed",
+		Success: false,
+		Error:   "",
+		Data:    nil,
+	}
+
 	services, err := h.svc.GetServices(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		res.Error = err.Error()
+		c.JSON(http.StatusInternalServerError, gin.H{"response": res})
 		return
 	}
 
@@ -81,15 +128,34 @@ func (h *ServiceHandler) ListServices(c *gin.Context) {
 		summaries[i] = ToServiceSummaryResponse(s)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"services": summaries})
+	res.Message = "Services retrieved successfully"
+	res.Data = summaries
+	c.JSON(http.StatusOK, gin.H{"response": res})
 }
 
 // GetService handles GET /services/:id.
+// @Summary      Get service details
+// @Description  Returns full details of a single service including latency and SSL info
+// @Tags         services
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Service ID"
+// @Success      200  {object}  map[string]ServiceDetailResponse
+// @Failure      401  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /services/{id} [get]
 func (h *ServiceHandler) GetService(c *gin.Context) {
 	userID := getUserID(c)
 	if userID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing X-User-ID header"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
+	}
+
+	res := models.ApiResponse{
+		Message: "Get Service Failed",
+		Success: false,
+		Error:   "",
+		Data:    nil,
 	}
 
 	serviceID := c.Param("id")
@@ -97,17 +163,34 @@ func (h *ServiceHandler) GetService(c *gin.Context) {
 	service, err := h.svc.GetServiceByID(serviceID, userID)
 	if err != nil {
 		if errors.Is(err, ErrServiceNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			res.Error = err.Error()
+			c.JSON(http.StatusNotFound, gin.H{"response": res})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		res.Error = err.Error()
+		c.JSON(http.StatusInternalServerError, gin.H{"response": res})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"service": ToServiceDetailResponse(*service)})
+	res.Message = "Service retrieved successfully"
+	res.Data = ToServiceDetailResponse(*service)
+	c.JSON(http.StatusOK, gin.H{"response": res})
 }
 
 // UpdateService handles PUT /services/:id.
+// @Summary      Update a service
+// @Description  Updates service configuration. URL cannot be changed.
+// @Tags         services
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string             true  "Service ID"
+// @Param        body body      UpdateServiceInput true  "Updated configuration"
+// @Success      200  {object}  map[string]string
+// @Failure      400  {object}  map[string]string
+// @Failure      401  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /services/{id} [put]
 func (h *ServiceHandler) UpdateService(c *gin.Context) {
 	userID := getUserID(c)
 	if userID == "" {
@@ -115,11 +198,19 @@ func (h *ServiceHandler) UpdateService(c *gin.Context) {
 		return
 	}
 
+	res := models.ApiResponse{
+		Message: "Update Service Failed",
+		Success: false,
+		Error:   "",
+		Data:    nil,
+	}
+
 	serviceID := c.Param("id")
 
 	var input UpdateServiceInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		res.Error = err.Error()
+		c.JSON(http.StatusBadRequest, gin.H{"response": res})
 		return
 	}
 
@@ -127,19 +218,34 @@ func (h *ServiceHandler) UpdateService(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrServiceNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			res.Error = err.Error()
+			c.JSON(http.StatusNotFound, gin.H{"response": res})
 		case errors.Is(err, ErrInvalidInterval):
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			res.Error = err.Error()
+			c.JSON(http.StatusBadRequest, gin.H{"response": res})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			res.Error = err.Error()
+			c.JSON(http.StatusInternalServerError, gin.H{"response": res})
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Service updated successfully"})
+	res.Message = "Service updated successfully"
+	res.Success = true
+	c.JSON(http.StatusOK, gin.H{"response": res})
 }
 
 // DeleteService handles DELETE /services/:id.
+// @Summary      Delete a service
+// @Description  Permanently deletes a service and all its probe history
+// @Tags         services
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "Service ID"
+// @Success      200  {object}  map[string]string
+// @Failure      401  {object}  map[string]string
+// @Failure      404  {object}  map[string]string
+// @Router       /services/{id} [delete]
 func (h *ServiceHandler) DeleteService(c *gin.Context) {
 	userID := getUserID(c)
 	if userID == "" {
@@ -147,17 +253,28 @@ func (h *ServiceHandler) DeleteService(c *gin.Context) {
 		return
 	}
 
+	res := models.ApiResponse{
+		Message: "Delete Service Failed",
+		Success: false,
+		Error:   "",
+		Data:    nil,
+	}
+
 	serviceID := c.Param("id")
 
 	err := h.svc.DeleteService(serviceID, userID)
 	if err != nil {
 		if errors.Is(err, ErrServiceNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			res.Error = err.Error()
+			c.JSON(http.StatusNotFound, gin.H{"response": res})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		res.Error = err.Error()
+		c.JSON(http.StatusInternalServerError, gin.H{"response": res})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Service deleted successfully"})
+	res.Message = "Service deleted successfully"
+	res.Success = true
+	c.JSON(http.StatusOK, gin.H{"response": res})
 }

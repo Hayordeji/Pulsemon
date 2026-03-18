@@ -60,7 +60,7 @@ func NewServiceService(repo *ServiceRepository, events chan ServiceEvent) *Servi
 
 // CreateService validates the input, enforces the per-user service limit, and
 // persists a new service.
-func (s *ServiceService) CreateService(userID string, input CreateServiceInput) (*models.Service, error) {
+func (s *ServiceService) CreateService(userID string, input CreateServiceInput) (*CreateServiceResponse, error) {
 	// Enforce per-user active service limit.
 	count, err := s.repo.CountActiveByUser(userID)
 	if err != nil {
@@ -109,7 +109,10 @@ func (s *ServiceService) CreateService(userID string, input CreateServiceInput) 
 		Interval:  service.Interval,
 	}
 
-	return service, nil
+	//MAP NEWLY CREATED SERVICE
+	mappedService := ToCreateServiceResponse(*service)
+
+	return &mappedService, nil
 }
 
 // GetServices returns all services belonging to the given user.

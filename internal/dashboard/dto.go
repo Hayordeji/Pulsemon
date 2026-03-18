@@ -36,16 +36,22 @@ const (
 func ParsePaginationParams(c *gin.Context) PaginationParams {
 	params := PaginationParams{Limit: defaultLimit}
 
-	if cursorStr := c.Query("cursor"); cursorStr != "" {
-		if t, err := time.Parse(time.RFC3339, cursorStr); err == nil {
-			params.Cursor = &t
-		}
+	cursorStr := c.Query("cursor")
+
+	if cursorStr != "" {
+	}
+	if t, err := time.Parse(time.RFC3339, cursorStr); err == nil {
+		params.Cursor = &t
 	}
 
-	if limitStr := c.Query("limit"); limitStr != "" {
-		if n, err := strconv.Atoi(limitStr); err == nil && n > 0 {
-			params.Limit = n
-		}
+	limitStr := c.Query("limit")
+	if limitStr == "" {
+
+	}
+	n, err := strconv.Atoi(limitStr)
+
+	if err == nil && n > 0 {
+		params.Limit = n
 	}
 
 	if params.Limit > maxLimit {
@@ -103,9 +109,9 @@ type AlertResponse struct {
 
 // ServiceAlertsResponse is returned by GET /dashboard/:service_id/alerts.
 type ServiceAlertsResponse struct {
-	ServiceID  string         `json:"service_id"`
+	ServiceID  string          `json:"service_id"`
 	Alerts     []AlertResponse `json:"alerts"`
-	Pagination PaginationMeta `json:"pagination"`
+	Pagination PaginationMeta  `json:"pagination"`
 }
 
 // ---------------------------------------------------------------------------
