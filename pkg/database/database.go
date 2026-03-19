@@ -3,8 +3,10 @@ package database
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"Pulsemon/pkg/config"
 
@@ -27,6 +29,22 @@ func Connect(cfg config.Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get underlying sql.DB: %w", err)
+	}
+
+	sqlDB.SetMaxOpenConns(25)
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetConnMaxLifetime(5 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(2 * time.Minute)
+
+	slog.Info("database connection pool configured",
+		"max_open_conns", 25,
+		"max_idle_conns", 10,
+		"conn_max_lifetime", "5m",
+		"conn_max_idle_time", "2m")
 
 	// Build the postgres connection URL for golang-migrate.
 	migrateDSN := fmt.Sprintf(

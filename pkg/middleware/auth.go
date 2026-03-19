@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -14,12 +15,20 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
+			slog.Warn("unauthorized request",
+				"request_id", c.GetString(RequestIDKey),
+				"path", c.Request.URL.Path,
+				"ip", c.ClientIP())
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
 			return
 		}
 
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
+			slog.Warn("unauthorized request",
+				"request_id", c.GetString(RequestIDKey),
+				"path", c.Request.URL.Path,
+				"ip", c.ClientIP())
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
 			return
 		}
@@ -35,12 +44,20 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
+			slog.Warn("unauthorized request",
+				"request_id", c.GetString(RequestIDKey),
+				"path", c.Request.URL.Path,
+				"ip", c.ClientIP())
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 			return
 		}
 
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
+			slog.Warn("unauthorized request",
+				"request_id", c.GetString(RequestIDKey),
+				"path", c.Request.URL.Path,
+				"ip", c.ClientIP())
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
 			return
 		}
@@ -49,6 +66,10 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 		email, ok2 := claims["email"].(string)
 
 		if !ok1 || !ok2 {
+			slog.Warn("unauthorized request",
+				"request_id", c.GetString(RequestIDKey),
+				"path", c.Request.URL.Path,
+				"ip", c.ClientIP())
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing essential claims"})
 			return
 		}

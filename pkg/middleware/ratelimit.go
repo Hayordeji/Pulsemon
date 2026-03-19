@@ -31,6 +31,7 @@ func (rl *RateLimiter) newMiddleware(rate limiter.Rate) gin.HandlerFunc {
 	middleware := mgin.NewMiddleware(instance,
 		mgin.WithLimitReachedHandler(func(c *gin.Context) {
 			slog.Warn("rate limit exceeded",
+				"request_id", c.GetString(RequestIDKey),
 				"ip", c.ClientIP(),
 				"path", c.Request.URL.Path)
 

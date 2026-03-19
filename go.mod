@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/gin-contrib/cors v1.7.6 // indirect
 	github.com/go-openapi/swag/conv v0.25.5 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.5 // indirect
 	github.com/go-openapi/swag/jsonutils v0.25.5 // indirect

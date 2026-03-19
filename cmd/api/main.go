@@ -144,12 +144,16 @@ func main() {
 	rateLimiter := middleware.NewRateLimiter()
 
 	// Start Gin router
-	router := gin.Default()
+	router := gin.New()
 
-	// Apply global rate limit to all routes
+	router.Use(gin.Recovery())
+	router.Use(middleware.NewCORSMiddleware(cfg))
+	router.Use(middleware.SecurityHeaders(cfg))
+	router.Use(middleware.RequestID())
+	router.Use(middleware.RequestLogger())
 	router.Use(rateLimiter.Global())
 
-	//Setup  scalar
+	//Setup Swagger
 	if cfg.AppEnv != "production" {
 		docs.SwaggerInfo.BasePath = "/api/v1"
 		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
