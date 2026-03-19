@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"Pulsemon/pkg/middleware"
 	"Pulsemon/pkg/models"
 	"errors"
 	"net/http"
@@ -19,9 +20,9 @@ func NewAuthHandler(svc *AuthService) *AuthHandler {
 }
 
 // RegisterRoutes wires up all auth-related routes on the given router.
-func (h *AuthHandler) RegisterRoutes(router *gin.RouterGroup) {
-	router.POST("/auth/register", h.Register)
-	router.POST("/auth/login", h.Login)
+func (h *AuthHandler) RegisterRoutes(router *gin.RouterGroup, rateLimiter *middleware.RateLimiter) {
+	router.POST("/auth/register", rateLimiter.AuthStrict(), h.Register)
+	router.POST("/auth/login", rateLimiter.AuthStrict(), h.Login)
 }
 
 // Register handles POST /auth/register.

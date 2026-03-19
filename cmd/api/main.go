@@ -2,16 +2,20 @@ package main
 
 import (
 	"context"
-	"log"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"Pulsemon/internal/alerts"
 	"Pulsemon/internal/auth"
 	"Pulsemon/internal/dashboard"
+	"Pulsemon/internal/health"
 	"Pulsemon/internal/processor"
+	"Pulsemon/internal/purge"
 	"Pulsemon/internal/scheduler"
 	"Pulsemon/internal/services"
 	"Pulsemon/internal/worker"
@@ -35,7 +39,6 @@ import (
 //	tracks latency, monitors SLA compliance, inspects SSL
 //	certificates, and sends email alerts.
 //
-// @securityDefinitions.apikey BearerAuth
 // @host            localhost:8080
 // @BasePath        /
 // @securityDefinitions.apikey BearerAuth
@@ -53,19 +56,32 @@ func main() {
 	// Load configuration from environment
 	cfg := config.Load()
 
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		slog.Error("invalid configuration",
+			"error", err)
+		os.Exit(1)
+	}
+
 	// Connect to PostgreSQL and run migrations
 	db, err := database.Connect(cfg)
 	if err != nil {
-		log.Fatalf("database connection failed: %v", err)
+		slog.Error("database connection failed",
+			"error", err)
+		os.Exit(1)
 	}
 
 	// Confirm connection is alive
 	sqlDB, err := db.DB()
 	if err != nil {
-		log.Fatalf("failed to get underlying sql.DB: %v", err)
+		slog.Error("failed to get underlying sql.DB",
+			"error", err)
+		os.Exit(1)
 	}
 	if err := sqlDB.Ping(); err != nil {
-		log.Fatalf("database ping failed: %v", err)
+		slog.Error("database ping failed",
+			"error", err)
+		os.Exit(1)
 	}
 	slog.Info("database connected and migrations applied successfully")
 
@@ -83,7 +99,7 @@ func main() {
 	// Register services, repositories and handlers
 	repo := services.NewServiceRepository(db)
 	svc := services.NewServiceService(repo, sched.Events())
-	handler := services.NewServiceHandler(svc)
+	serviceHandler := services.NewServiceHandler(svc)
 
 	// Create dashboard repository and handler
 	dashboardRepo := dashboard.NewDashboardRepository(db)
@@ -98,55 +114,91 @@ func main() {
 	alertEngine := alerts.NewAlertEngine(db, cfg)
 	proc := processor.NewProcessor(db, results, alertEngine)
 
-	// Start scheduler, worker pool, and result processor in background
-	ctx := context.Background()
+	// Create purger
+	purger := purge.NewPurger(db)
+
+	// Create cancellable context with OS signal handling
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-quit
+		slog.Info("shutdown signal received",
+			"signal", sig.String())
+		cancel()
+	}()
+
+	// Start background goroutines
 	go sched.Start(ctx)
 	go workerPool.Start(ctx)
 	go proc.Start(ctx)
+	go purger.Start(ctx)
+
+	// Create health handler
+	healthHandler := health.NewHealthHandler(db)
+
+	// Create rate limiter
+	rateLimiter := middleware.NewRateLimiter()
 
 	// Start Gin router
 	router := gin.Default()
+
+	// Apply global rate limit to all routes
+	router.Use(rateLimiter.Global())
 
 	//Setup  scalar
 	if cfg.AppEnv != "production" {
 		docs.SwaggerInfo.BasePath = "/api/v1"
 		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
-
-		// router.GET("/docs", openapiui.WrapHandler(openapiui.Config{
-		// 	SpecURL:      "/docs/swagger.json",
-		// 	SpecFilePath: "../docs/swagger.json",
-		// 	Title:        "Pulsemon API Documentation V1",
-		// 	Theme:        "dark", // or "light ... I prefer dark mode "
-		// }))
-		// router.Static("/docs/swagger.json", "../docs/swagger.json")
 	}
 
-	//Unprotected Routes
+	// Unprotected routes
 	v1 := router.Group("/api/v1")
 	{
-		authHandler.RegisterRoutes(v1)
+		healthHandler.RegisterRoutes(v1)
+		authHandler.RegisterRoutes(v1, rateLimiter)
 	}
-	//Protected Routes
+
+	// Protected routes with JWT middleware
 	api := router.Group("/api/v1", middleware.AuthMiddleware(cfg.JWTSecret))
 	{
-		dashboardHandler.RegisterRoutes(api)
-		handler.RegisterRoutes(api)
+		dashboardHandler.RegisterRoutes(api, rateLimiter)
+		serviceHandler.RegisterRoutes(api, rateLimiter)
 	}
 
-	// Run server
-	log.Printf("server starting on port %s", cfg.ServerPort)
-	router.Run(":" + cfg.ServerPort)
-}
+	// Graceful HTTP server
+	srv := &http.Server{
+		Addr:    ":" + cfg.ServerPort,
+		Handler: router,
+	}
 
-// PingExample godoc
-// @Summary ping example
-// @Schemes
-// @Description do ping
-// @Tags example
-// @Accept json
-// @Produce json
-// @Success 200 {string} Helloworld
-// @Router /example/helloworld [get]
-func Helloworld(g *gin.Context) {
-	g.JSON(http.StatusOK, "helloworld")
+	go func() {
+		if err := srv.ListenAndServe(); err != nil &&
+			!errors.Is(err, http.ErrServerClosed) {
+			slog.Error("server error",
+				"error", err)
+			cancel()
+		}
+	}()
+
+	slog.Info("server started",
+		"port", cfg.ServerPort)
+
+	<-ctx.Done()
+
+	slog.Info("shutting down server gracefully")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(
+		context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Error("server forced to shutdown",
+			"error", err)
+	}
+
+	slog.Info("server stopped")
 }

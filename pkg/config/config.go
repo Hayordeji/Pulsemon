@@ -54,10 +54,25 @@ func Load() Config {
 	}
 }
 
-func RequireEnv(key string) {
-
-	v := os.Getenv(key)
-	if v == "" {
-		panic(fmt.Sprintf("%s", "Missing environment variable: "+key))
+// Validate checks that all required configuration fields are set.
+func (c Config) Validate() error {
+	required := map[string]string{
+		"DB_HOST":           c.DBHost,
+		"DB_PORT":           c.DBPort,
+		"DB_USER":           c.DBUser,
+		"DB_PASSWORD":       c.DBPassword,
+		"DB_NAME":           c.DBName,
+		"JWT_SECRET":        c.JWTSecret,
+		"RESEND_API_KEY":    c.ResendAPIKey,
+		"RESEND_FROM_EMAIL": c.ResendFromEmail,
+		"SERVER_PORT":       c.ServerPort,
 	}
+
+	for name, value := range required {
+		if value == "" {
+			return fmt.Errorf("missing required environment variable: %s", name)
+		}
+	}
+
+	return nil
 }
