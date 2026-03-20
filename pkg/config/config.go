@@ -27,6 +27,7 @@ type Config struct {
 	AdminPassword   string
 	AdminUsername   string
 	AppBaseURL      string
+	DBSSLMode       string
 }
 
 func Load() Config {
@@ -61,6 +62,7 @@ func Load() Config {
 		AdminPassword:   os.Getenv("ADMIN_PASSWORD"),
 		AdminUsername:   os.Getenv("ADMIN_USERNAME"),
 		AppBaseURL:      os.Getenv("APP_BASE_URL"),
+		DBSSLMode:       os.Getenv("DB_SSL_MODE"),
 	}
 }
 
@@ -78,6 +80,10 @@ func (c Config) Validate() error {
 		"SERVER_PORT":       c.ServerPort,
 		"ALLOWED_ORIGINS":   c.AllowedOrigins,
 		"APP_BASE_URL":      c.AppBaseURL,
+	}
+
+	if c.DBSSLMode == "" {
+		c.DBSSLMode = "disable"
 	}
 
 	for name, value := range required {
