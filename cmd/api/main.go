@@ -15,6 +15,7 @@ import (
 	"Pulsemon/internal/auth"
 	"Pulsemon/internal/dashboard"
 	"Pulsemon/internal/health"
+	"Pulsemon/internal/keepalive"
 	"Pulsemon/internal/processor"
 	"Pulsemon/internal/purge"
 	"Pulsemon/internal/roleseeder"
@@ -160,6 +161,15 @@ func main() {
 	go proc.Start(ctx)
 	go purger.Start(ctx)
 
+	// // Only run keep-alive in production
+	// if cfg.AppEnv == "production" {
+	// 	keepAlive := keepalive.NewKeepAlive(cfg)
+	// 	go keepAlive.Start(ctx)
+	// }
+
+	keepAlive := keepalive.NewKeepAlive(cfg)
+	go keepAlive.Start(ctx)
+
 	// Create health handler
 	healthHandler := health.NewHealthHandler(db)
 
@@ -180,6 +190,7 @@ func main() {
 	if cfg.AppEnv != "production" {
 		docs.SwaggerInfo.BasePath = "/api/v1"
 		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
+
 	}
 
 	// Unprotected routes
