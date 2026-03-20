@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"Pulsemon/pkg/middleware"
 	"Pulsemon/pkg/models"
 	"log/slog"
 	"net/http"
@@ -19,9 +20,9 @@ func NewDashboardHandler(repo *DashboardRepository) *DashboardHandler {
 }
 
 // RegisterRoutes wires up all dashboard-related routes on the given router.
-func (h *DashboardHandler) RegisterRoutes(router *gin.RouterGroup) {
-	router.GET("/dashboard/:service_id", h.GetDashboard)
-	router.GET("/dashboard/:service_id/alerts", h.GetServiceAlerts)
+func (h *DashboardHandler) RegisterRoutes(router *gin.RouterGroup, rateLimiter *middleware.RateLimiter) {
+	router.GET("/dashboard/:service_id", rateLimiter.Read(), h.GetDashboard)
+	router.GET("/dashboard/:service_id/alerts", rateLimiter.Read(), h.GetServiceAlerts)
 }
 
 // getUserID extracts the user identity from the X-User-ID header.

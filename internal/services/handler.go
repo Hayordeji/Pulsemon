@@ -1,6 +1,7 @@
 package services
 
 import (
+	"Pulsemon/pkg/middleware"
 	"Pulsemon/pkg/models"
 	"errors"
 	"net/http"
@@ -29,12 +30,12 @@ func getUserID(c *gin.Context) string {
 }
 
 // RegisterRoutes wires up all service-related routes on the given router.
-func (h *ServiceHandler) RegisterRoutes(router *gin.RouterGroup) {
-	router.GET("/services", h.ListServices)
-	router.POST("/services", h.CreateService)
-	router.GET("/services/:id", h.GetService)
-	router.PUT("/services/:id", h.UpdateService)
-	router.DELETE("/services/:id", h.DeleteService)
+func (h *ServiceHandler) RegisterRoutes(router *gin.RouterGroup, rateLimiter *middleware.RateLimiter) {
+	router.GET("/services", rateLimiter.Read(), h.ListServices)
+	router.POST("/services", rateLimiter.Write(), h.CreateService)
+	router.GET("/services/:id", rateLimiter.Read(), h.GetService)
+	router.PUT("/services/:id", rateLimiter.Write(), h.UpdateService)
+	router.DELETE("/services/:id", rateLimiter.Write(), h.DeleteService)
 }
 
 // CreateService handles POST /services.

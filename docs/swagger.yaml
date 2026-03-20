@@ -13,6 +13,15 @@ definitions:
         type: string
       password:
         type: string
+      username:
+        type: string
+    type: object
+  auth.VerifyEmailInput:
+    properties:
+      token:
+        type: string
+      userID:
+        type: string
     type: object
   dashboard.AlertResponse:
     properties:
@@ -299,6 +308,68 @@ paths:
       summary: Register a new user account
       tags:
       - auth
+  /auth/resend-verify:
+    post:
+      description: Generates a new verification token and resends the email
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Resend verification email
+      tags:
+      - auth
+  /auth/verify:
+    post:
+      consumes:
+      - application/json
+      description: Verifies a user's email using the token sent to their inbox
+      parameters:
+      - description: Verification token
+        in: query
+        name: token
+        type: string
+      - description: Verification token (alternative to query param)
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/auth.VerifyEmailInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Verify user email
+      tags:
+      - auth
   /dashboard/{service_id}:
     get:
       description: Returns full health overview including latency, SLA, SSL and recent
@@ -554,7 +625,7 @@ paths:
       - services
 securityDefinitions:
   BearerAuth:
-    description: Type "Bearer" followed by a space and your JWT token.
+    description: JWT token.
     in: header
     name: Authorization
     type: apiKey

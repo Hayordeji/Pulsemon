@@ -11,17 +11,22 @@ import (
 )
 
 type Config struct {
-	DBHost         string
-	DBPort         string
-	DBUser         string
-	DBPassword     string
-	DBName         string
+	DBHost          string
+	DBPort          string
+	DBUser          string
+	DBPassword      string
+	DBName          string
 	ServerPort      string
 	JWTSecret       string
 	ResendAPIKey    string
 	ResendFromEmail string
 	WorkerPoolSize  int
 	AppEnv          string
+	AllowedOrigins  string
+	AdminEmail      string
+	AdminPassword   string
+	AdminUsername   string
+	AppBaseURL      string
 }
 
 func Load() Config {
@@ -40,24 +45,52 @@ func Load() Config {
 	}
 
 	return Config{
-		DBHost:         os.Getenv("DB_HOST"),
-		DBPort:         os.Getenv("DB_PORT"),
-		DBUser:         os.Getenv("DB_USER"),
-		DBPassword:     os.Getenv("DB_PASSWORD"),
-		DBName:         os.Getenv("DB_NAME"),
-		ServerPort:     os.Getenv("SERVER_PORT"),
-		JWTSecret:      os.Getenv("JWT_SECRET"),
+		DBHost:          os.Getenv("DB_HOST"),
+		DBPort:          os.Getenv("DB_PORT"),
+		DBUser:          os.Getenv("DB_USER"),
+		DBPassword:      os.Getenv("DB_PASSWORD"),
+		DBName:          os.Getenv("DB_NAME"),
+		ServerPort:      os.Getenv("SERVER_PORT"),
+		JWTSecret:       os.Getenv("JWT_SECRET"),
 		ResendAPIKey:    os.Getenv("RESEND_API_KEY"),
 		ResendFromEmail: os.Getenv("RESEND_FROM_EMAIL"),
 		WorkerPoolSize:  workerPoolSize,
 		AppEnv:          os.Getenv("APP_ENV"),
+		AllowedOrigins:  os.Getenv("ALLOWED_ORIGINS"),
+		AdminEmail:      os.Getenv("ADMIN_EMAIL"),
+		AdminPassword:   os.Getenv("ADMIN_PASSWORD"),
+		AdminUsername:   os.Getenv("ADMIN_USERNAME"),
+		AppBaseURL:      os.Getenv("APP_BASE_URL"),
 	}
 }
 
-func RequireEnv(key string) {
-
-	v := os.Getenv(key)
-	if v == "" {
-		panic(fmt.Sprintf("%s", "Missing environment variable: "+key))
+// Validate checks that all required configuration fields are set.
+func (c Config) Validate() error {
+	required := map[string]string{
+		"DB_HOST":           c.DBHost,
+		"DB_PORT":           c.DBPort,
+		"DB_USER":           c.DBUser,
+		"DB_PASSWORD":       c.DBPassword,
+		"DB_NAME":           c.DBName,
+		"JWT_SECRET":        c.JWTSecret,
+		"RESEND_API_KEY":    c.ResendAPIKey,
+		"RESEND_FROM_EMAIL": c.ResendFromEmail,
+		"SERVER_PORT":       c.ServerPort,
+		"ALLOWED_ORIGINS":   c.AllowedOrigins,
+		"APP_BASE_URL":      c.AppBaseURL,
 	}
+
+	for name, value := range required {
+		if value == "" {
+			return fmt.Errorf("missing required environment variable: %s", name)
+		}
+	}
+
+	adminFieldsSet := c.AdminEmail != "" || c.AdminPassword != "" || c.AdminUsername != ""
+	adminFieldsAllSet := c.AdminEmail != "" && c.AdminPassword != "" && c.AdminUsername != ""
+	if adminFieldsSet && !adminFieldsAllSet {
+		return fmt.Errorf("admin seed requires ADMIN_EMAIL, ADMIN_PASSWORD and ADMIN_USERNAME to all be set or all be empty")
+	}
+
+	return nil
 }

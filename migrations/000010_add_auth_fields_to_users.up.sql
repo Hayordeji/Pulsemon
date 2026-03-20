@@ -1,0 +1,19 @@
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS is_verified
+    BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS verification_token
+    VARCHAR(255);
+
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS token_expires_at
+    TIMESTAMP;
+
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS refresh_token
+    VARCHAR(512);
+
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS refresh_token_expiry
+    TIMESTAMP;  
