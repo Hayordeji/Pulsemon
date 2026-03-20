@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"Pulsemon/pkg/models"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -64,19 +66,25 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 
 		userID, ok1 := claims["userID"].(string)
 		email, ok2 := claims["email"].(string)
+		roleID, ok3 := claims["roleID"].(string)
 
-		if !ok1 || !ok2 {
+		if !ok1 || !ok2 || !ok3 {
 			slog.Warn("unauthorized request",
-				"request_id", c.GetString(RequestIDKey),
+				"request_id", c.GetString("requestID"), // Fix missing constant if needed
 				"path", c.Request.URL.Path,
 				"ip", c.ClientIP())
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing essential claims"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, models.ApiResponse{
+				Success: false,
+				Message: "Unauthorized",
+				Error:   "invalid token claims",
+			})
 			return
 		}
 
 		// Set values in Gin context
 		c.Set("userID", userID)
 		c.Set("email", email)
+		c.Set("roleID", roleID)
 
 		c.Next()
 	}

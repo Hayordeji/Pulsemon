@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"Pulsemon/pkg/models"
 
@@ -25,6 +26,8 @@ type CreateUserInput struct {
 	ID           uuid.UUID
 	Email        string
 	PasswordHash string
+	RoleID       uuid.UUID
+	Username     string
 }
 
 // CreateUser inserts a new user into the database.
@@ -33,6 +36,8 @@ func (r *AuthRepository) CreateUser(input CreateUserInput) error {
 		ID:           input.ID,
 		Email:        input.Email,
 		PasswordHash: input.PasswordHash,
+		RoleID:       input.RoleID,
+		Username:     input.Username,
 	}
 
 	return r.db.Create(&user).Error
@@ -56,4 +61,93 @@ func (r *AuthRepository) FindUserByEmail(input FindUserByEmailInput) (*models.Us
 	}
 
 	return &user, nil
+}
+
+// FindUserByName retrieves a user by their email address.
+func (r *AuthRepository) FindUserByName(userName string) (*models.User, error) {
+	var user models.User
+	err := r.db.Where("username = ?", strings.ToLower(userName)).First(&user).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil // Return nil, nil if not found
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+// FindUserByIDInput holds data for finding a user by ID.
+type FindUserByIDInput struct {
+	UserID string
+}
+
+// FindUserByID retrieves a user by their UUID.
+func (r *AuthRepository) FindUserByID(input FindUserByIDInput) (*models.User, error) {
+	var user models.User
+	err := r.db.Where("id = ?", input.UserID).First(&user).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+// UpdateVerificationTokenInput holds data to set the verification token.
+type UpdateVerificationTokenInput struct {
+	UserID    string
+	Token     string
+	ExpiresAt time.Time
+}
+
+// UpdateVerificationToken sets the verification token and expiry for a user.
+func (r *AuthRepository) UpdateVerificationToken(input UpdateVerificationTokenInput) error {
+	return r.db.Model(&models.User{}).
+		Where("id = ?", input.UserID).
+		Updates(map[string]interface{}{
+			"verification_token": input.Token,
+			"token_expires_at":   input.ExpiresAt,
+		}).Error
+}
+
+// VerifyUserInput holds data for verifying a user by token.
+type VerifyUserInput struct {
+	Token  string
+	UserID string
+}
+
+// VerifyUser retrieves a user by a verification token that hasn't expired.
+func (r *AuthRepository) VerifyUser(input VerifyUserInput) (*models.User, error) {
+	var user models.User
+	err := r.db.Where("verification_token = ? AND token_expires_at > ?", input.Token, time.Now()).First(&user).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+// SetVerifiedInput holds data to mark a user as verified.
+type SetVerifiedInput struct {
+	UserID string
+}
+
+// SetVerified marks a user as verified and clears the token details.
+func (r *AuthRepository) SetVerified(input SetVerifiedInput) error {
+	return r.db.Model(&models.User{}).
+		Where("id = ?", input.UserID).
+		Updates(map[string]interface{}{
+			"is_verified":        true,
+			"verification_token": gorm.Expr("NULL"),
+			"token_expires_at":   gorm.Expr("NULL"),
+		}).Error
 }

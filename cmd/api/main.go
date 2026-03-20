@@ -10,12 +10,14 @@ import (
 	"syscall"
 	"time"
 
+	"Pulsemon/internal/adminseeder"
 	"Pulsemon/internal/alerts"
 	"Pulsemon/internal/auth"
 	"Pulsemon/internal/dashboard"
 	"Pulsemon/internal/health"
 	"Pulsemon/internal/processor"
 	"Pulsemon/internal/purge"
+	"Pulsemon/internal/roleseeder"
 	"Pulsemon/internal/scheduler"
 	"Pulsemon/internal/services"
 	"Pulsemon/internal/worker"
@@ -85,6 +87,26 @@ func main() {
 	}
 	slog.Info("database connected and migrations applied successfully")
 
+	// Seed roles and load registry
+	seeder := roleseeder.NewSeeder(db)
+	registry, err := seeder.Seed(context.Background())
+	if err != nil {
+		slog.Error("failed to seed roles",
+			"error", err)
+		os.Exit(1)
+	}
+	slog.Info("roles loaded",
+		"user_role_id", registry.UserRoleID.String(),
+		"admin_role_id", registry.AdminRoleID.String())
+
+	// Seed admin user after roles
+	adminSeeder := adminseeder.NewAdminSeeder(db, cfg, registry)
+	if err := adminSeeder.Seed(context.Background()); err != nil {
+		slog.Error("failed to seed admin user",
+			"error", err)
+		os.Exit(1)
+	}
+
 	// Create channels
 	jobs := make(chan scheduler.ProbeJob, 100)
 	results := make(chan worker.ProbeResult, 100)
@@ -106,8 +128,9 @@ func main() {
 	dashboardHandler := dashboard.NewDashboardHandler(dashboardRepo)
 
 	// Create auth services,repository and handler
+	// resendClient := resend.NewClient(cfg.ResendAPIKey)
 	authRepo := auth.NewAuthRepository(db)
-	authSvc := auth.NewAuthService(authRepo, cfg)
+	authSvc := auth.NewAuthService(authRepo, cfg, registry)
 	authHandler := auth.NewAuthHandler(authSvc)
 
 	// Create alert engine and processor
@@ -163,15 +186,26 @@ func main() {
 	v1 := router.Group("/api/v1")
 	{
 		healthHandler.RegisterRoutes(v1)
-		authHandler.RegisterRoutes(v1, rateLimiter)
+		authHandler.RegisterRoutes(v1, rateLimiter, cfg.JWTSecret)
 	}
 
-	// Protected routes with JWT middleware
-	api := router.Group("/api/v1", middleware.AuthMiddleware(cfg.JWTSecret))
+	// Protected routes with JWT middleware and Email verification check
+	api := router.Group("/api/v1",
+		middleware.AuthMiddleware(cfg.JWTSecret),
+		middleware.VerifiedMiddleware(db),
+	)
 	{
 		dashboardHandler.RegisterRoutes(api, rateLimiter)
 		serviceHandler.RegisterRoutes(api, rateLimiter)
 	}
+
+	// Admin route group
+	admin := router.Group("/api/v1/admin",
+		middleware.AuthMiddleware(cfg.JWTSecret),
+		middleware.AdminOnly(registry),
+	)
+	// Admin routes registered here in future steps
+	_ = admin
 
 	// Graceful HTTP server
 	srv := &http.Server{

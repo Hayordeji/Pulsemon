@@ -17,7 +17,7 @@ func SecurityHeaders(cfg config.Config) gin.HandlerFunc {
 		c.Header("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
 
 		if cfg.AppEnv == "production" {
-			c.Header("Strict-Transport-Security", "max-age=31536160; includeSubDomains")
+			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
 
 		c.Next()

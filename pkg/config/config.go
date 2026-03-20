@@ -23,6 +23,10 @@ type Config struct {
 	WorkerPoolSize  int
 	AppEnv          string
 	AllowedOrigins  string
+	AdminEmail      string
+	AdminPassword   string
+	AdminUsername   string
+	AppBaseURL      string
 }
 
 func Load() Config {
@@ -53,6 +57,10 @@ func Load() Config {
 		WorkerPoolSize:  workerPoolSize,
 		AppEnv:          os.Getenv("APP_ENV"),
 		AllowedOrigins:  os.Getenv("ALLOWED_ORIGINS"),
+		AdminEmail:      os.Getenv("ADMIN_EMAIL"),
+		AdminPassword:   os.Getenv("ADMIN_PASSWORD"),
+		AdminUsername:   os.Getenv("ADMIN_USERNAME"),
+		AppBaseURL:      os.Getenv("APP_BASE_URL"),
 	}
 }
 
@@ -69,12 +77,19 @@ func (c Config) Validate() error {
 		"RESEND_FROM_EMAIL": c.ResendFromEmail,
 		"SERVER_PORT":       c.ServerPort,
 		"ALLOWED_ORIGINS":   c.AllowedOrigins,
+		"APP_BASE_URL":      c.AppBaseURL,
 	}
 
 	for name, value := range required {
 		if value == "" {
 			return fmt.Errorf("missing required environment variable: %s", name)
 		}
+	}
+
+	adminFieldsSet := c.AdminEmail != "" || c.AdminPassword != "" || c.AdminUsername != ""
+	adminFieldsAllSet := c.AdminEmail != "" && c.AdminPassword != "" && c.AdminUsername != ""
+	if adminFieldsSet && !adminFieldsAllSet {
+		return fmt.Errorf("admin seed requires ADMIN_EMAIL, ADMIN_PASSWORD and ADMIN_USERNAME to all be set or all be empty")
 	}
 
 	return nil
