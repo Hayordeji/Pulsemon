@@ -74,6 +74,7 @@ func (c Config) Validate() error {
 		"DB_USER":           c.DBUser,
 		"DB_PASSWORD":       c.DBPassword,
 		"DB_NAME":           c.DBName,
+		"DB_SSL_MODE":       c.DBSSLMode,
 		"JWT_SECRET":        c.JWTSecret,
 		"RESEND_API_KEY":    c.ResendAPIKey,
 		"RESEND_FROM_EMAIL": c.ResendFromEmail,
