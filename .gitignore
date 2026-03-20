@@ -29,3 +29,5 @@ tmp/
 /misc
 
 .env.prod
+*.exe
+__debug_bin.exe2061105147
