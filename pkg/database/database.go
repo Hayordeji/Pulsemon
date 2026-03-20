@@ -48,8 +48,8 @@ func Connect(cfg config.Config) (*gorm.DB, error) {
 
 	// Build the postgres connection URL for golang-migrate.
 	migrateDSN := fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName,
+		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
+		cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName, cfg.DBSSLMode,
 	)
 
 	if err := runMigrations(migrateDSN); err != nil {
