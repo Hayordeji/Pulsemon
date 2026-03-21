@@ -188,6 +188,7 @@ func main() {
 
 	//Setup Swagger
 	if cfg.AppEnv != "production" {
+		docs.SwaggerInfo.Host = cfg.AppBaseURL
 		docs.SwaggerInfo.BasePath = "/api/v1"
 		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 

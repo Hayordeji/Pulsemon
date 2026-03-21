@@ -1,5 +1,10 @@
 basePath: /
 definitions:
+  auth.ForgotPasswordRequest:
+    properties:
+      email:
+        type: string
+    type: object
   auth.LoginInput:
     properties:
       email:
@@ -14,6 +19,15 @@ definitions:
       password:
         type: string
       username:
+        type: string
+    type: object
+  auth.ResetPasswordRequest:
+    properties:
+      new_password:
+        type: string
+      token:
+        type: string
+      user_id:
         type: string
     type: object
   auth.VerifyEmailInput:
@@ -236,6 +250,39 @@ info:
   title: Pulsemon
   version: "1.0"
 paths:
+  /auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: Sends a password reset email if the account exists
+      parameters:
+      - description: Forgot Password details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.ForgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Request password reset
+      tags:
+      - auth
   /auth/login:
     post:
       consumes:
@@ -332,6 +379,47 @@ paths:
       security:
       - BearerAuth: []
       summary: Resend verification email
+      tags:
+      - auth
+  /auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Resets a user password using a valid token
+      parameters:
+      - description: Reset token
+        in: query
+        name: token
+        type: string
+      - description: User ID
+        in: query
+        name: user_id
+        type: string
+      - description: Reset Password details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Reset password
       tags:
       - auth
   /auth/verify:
