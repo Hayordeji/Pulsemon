@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -42,7 +43,6 @@ import (
 //	tracks latency, monitors SLA compliance, inspects SSL
 //	certificates, and sends email alerts.
 //
-// @host            localhost:8080
 // @BasePath        /
 // @securityDefinitions.apikey BearerAuth
 // @in              header
@@ -186,9 +186,13 @@ func main() {
 	router.Use(middleware.RequestLogger())
 	router.Use(rateLimiter.Global())
 
+	host := cfg.AppBaseURL
+	host = strings.TrimPrefix(host, "https://")
+	host = strings.TrimPrefix(host, "http://")
+
 	//Setup Swagger
 	if cfg.AppEnv != "production" {
-		docs.SwaggerInfo.Host = cfg.AppBaseURL
+		docs.SwaggerInfo.Host = host
 		docs.SwaggerInfo.BasePath = "/api/v1"
 		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 

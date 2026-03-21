@@ -248,7 +248,6 @@ definitions:
       timeout_seconds:
         type: integer
     type: object
-host: localhost:8080
 info:
   contact: {}
   description: A multi-tenant backend that probes HTTP/HTTPS endpoints,
