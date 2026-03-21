@@ -176,11 +176,6 @@ const docTemplate = `{
         },
         "/auth/resend-verify": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "Generates a new verification token and resends the email",
                 "produces": [
                     "application/json"
@@ -189,6 +184,17 @@ const docTemplate = `{
                     "auth"
                 ],
                 "summary": "Resend verification email",
+                "parameters": [
+                    {
+                        "description": "Resend verification email",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.ResendVerificationInput"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -753,6 +759,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "auth.ResendVerificationInput": {
+            "type": "object",
+            "properties": {
+                "email": {
                     "type": "string"
                 }
             }

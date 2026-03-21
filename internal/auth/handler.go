@@ -190,8 +190,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 // @Description  Generates a new verification token and resends the email
 // @Tags         auth
 // @Produce      json
-// @Security     BearerAuth
-// @Param		body ResendVerificationInput true "Resend verification email"
+// @Param		body body ResendVerificationInput true "Resend verification email"
 // @Success      200  {object}  map[string]interface{}
 // @Failure      401  {object}  map[string]interface{}
 // @Failure      409  {object}  map[string]interface{}

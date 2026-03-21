@@ -21,6 +21,11 @@ definitions:
       username:
         type: string
     type: object
+  auth.ResendVerificationInput:
+    properties:
+      email:
+        type: string
+    type: object
   auth.ResetPasswordRequest:
     properties:
       new_password:
@@ -358,6 +363,13 @@ paths:
   /auth/resend-verify:
     post:
       description: Generates a new verification token and resends the email
+      parameters:
+      - description: Resend verification email
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.ResendVerificationInput'
       produces:
       - application/json
       responses:
@@ -376,8 +388,6 @@ paths:
           schema:
             additionalProperties: true
             type: object
-      security:
-      - BearerAuth: []
       summary: Resend verification email
       tags:
       - auth
