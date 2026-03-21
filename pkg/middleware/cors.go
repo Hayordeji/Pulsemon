@@ -13,7 +13,7 @@ import (
 
 // NewCORSMiddleware creates a CORS middleware configured from the application config.
 func NewCORSMiddleware(cfg config.Config) gin.HandlerFunc {
-	allowedOrigins := []string{"http://localhost:3000"}
+	allowedOrigins := []string{"http://localhost:8080"}
 
 	if cfg.AllowedOrigins != "" {
 		parts := strings.Split(cfg.AllowedOrigins, ",")

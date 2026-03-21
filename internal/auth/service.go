@@ -18,12 +18,14 @@ import (
 )
 
 var (
-	ErrEmailAlreadyExists    = errors.New("email already registered")
-	ErrUsernameAlreadyExists = errors.New("username already registered")
-	ErrInvalidCredentials    = errors.New("invalid email or password")
-	ErrInvalidOrExpiredToken = errors.New("invalid or expired verification token")
-	ErrAlreadyVerified       = errors.New("email already verified")
-	ErrUserIsNotVerified     = errors.New("user is not verified")
+	ErrEmailAlreadyExists         = errors.New("email already registered")
+	ErrUsernameAlreadyExists      = errors.New("username already registered")
+	ErrInvalidCredentials         = errors.New("invalid email or password")
+	ErrInvalidOrExpiredToken      = errors.New("invalid or expired verification token")
+	ErrAlreadyVerified            = errors.New("email already verified")
+	ErrUserIsNotVerified          = errors.New("user is not verified")
+	ErrInvalidOrExpiredResetToken = errors.New("invalid or expired reset token")
+	ErrInvalidNewPassword         = errors.New("password must be at least 8 characters")
 )
 
 type AuthService struct {
@@ -94,7 +96,7 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) error {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 
-	token := uuid.New().String()
+	token := fmt.Sprintf("verify_%s", uuid.New().String())
 	expiresAt := time.Now().Add(24 * time.Hour)
 
 	err = s.repo.UpdateVerificationToken(UpdateVerificationTokenInput{
@@ -184,6 +186,10 @@ type VerifyEmailInput struct {
 }
 
 func (s *AuthService) VerifyEmail(ctx context.Context, input VerifyEmailInput) error {
+	if !strings.HasPrefix(input.Token, "verify_") {
+		return ErrInvalidOrExpiredToken
+	}
+
 	user, err := s.repo.VerifyUser(VerifyUserInput{Token: input.Token, UserID: input.UserID})
 	if err != nil {
 		return fmt.Errorf("failed to verify user token: %w", err)
@@ -208,11 +214,11 @@ func (s *AuthService) VerifyEmail(ctx context.Context, input VerifyEmailInput) e
 }
 
 type ResendVerificationInput struct {
-	UserID string
+	Email string `json:"email"`
 }
 
 func (s *AuthService) ResendVerification(ctx context.Context, input ResendVerificationInput) error {
-	user, err := s.repo.FindUserByID(FindUserByIDInput{UserID: input.UserID})
+	user, err := s.repo.FindUserByEmail(FindUserByEmailInput{Email: input.Email})
 	if err != nil {
 		return fmt.Errorf("failed to find user: %w", err)
 	}
@@ -224,11 +230,11 @@ func (s *AuthService) ResendVerification(ctx context.Context, input ResendVerifi
 		return ErrAlreadyVerified
 	}
 
-	token := uuid.New().String()
+	token := fmt.Sprintf("verify_%s", uuid.New().String())
 	expiresAt := time.Now().Add(24 * time.Hour)
 
 	err = s.repo.UpdateVerificationToken(UpdateVerificationTokenInput{
-		UserID:    input.UserID,
+		UserID:    user.ID.String(),
 		Token:     token,
 		ExpiresAt: expiresAt,
 	})
@@ -236,7 +242,111 @@ func (s *AuthService) ResendVerification(ctx context.Context, input ResendVerifi
 		return fmt.Errorf("failed to update verification token: %w", err)
 	}
 
-	go s.sendVerificationEmail(user.Email, input.UserID, token)
+	go s.sendVerificationEmail(user.Email, user.ID.String(), token)
+
+	return nil
+}
+
+type ForgotPasswordInput struct {
+	Email string
+}
+
+func (s *AuthService) ForgotPassword(ctx context.Context, input ForgotPasswordInput) error {
+	user, err := s.repo.FindUserByEmail(FindUserByEmailInput{Email: input.Email})
+	if err != nil {
+		return fmt.Errorf("failed to check existing user: %w", err)
+	}
+	if user == nil {
+		slog.Info("forgot password requested for unknown email", "email", input.Email)
+		return nil
+	}
+
+	token := fmt.Sprintf("reset_%s", uuid.New().String())
+	expiresAt := time.Now().Add(30 * time.Minute)
+
+	err = s.repo.SetResetToken(SetResetTokenInput{
+		UserID:    user.ID.String(),
+		Token:     token,
+		ExpiresAt: expiresAt,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to set reset token: %w", err)
+	}
+
+	go func() {
+		s.sendPasswordResetEmail(user.Email, user.ID.String(), token)
+	}()
+
+	slog.Info("password reset email sent", "user_id", user.ID.String())
+
+	return nil
+}
+
+func (s *AuthService) sendPasswordResetEmail(email string, userID string, token string) {
+	url := fmt.Sprintf("%s/api/v1/auth/reset-password?token=%s&user_id=%s", s.cfg.AppBaseURL, token, userID)
+
+	body := fmt.Sprintf("You requested a password reset for your Pulsemon account.\n\n"+
+		"Click the link below to reset your password:\n"+
+		"%s\n\n"+
+		"This link expires in 30 minutes.\n\n"+
+		"If you did not request a password reset, ignore this email.\n"+
+		"Your password will not be changed.", url)
+
+	params := &resend.SendEmailRequest{
+		From:    s.cfg.ResendFromEmail,
+		To:      []string{email},
+		Subject: "Reset your Pulsemon password",
+		Text:    body,
+	}
+
+	_, err := s.resend.Emails.Send(params)
+	if err != nil {
+		slog.Error("failed to send password reset email",
+			"email", email,
+			"error", err)
+	}
+}
+
+type ResetPasswordInput struct {
+	UserID      string
+	Token       string
+	NewPassword string
+}
+
+func (s *AuthService) ResetPassword(ctx context.Context, input ResetPasswordInput) error {
+	if !strings.HasPrefix(input.Token, "reset_") {
+		return ErrInvalidOrExpiredResetToken
+	}
+
+	if len(input.NewPassword) < 8 {
+		return ErrInvalidNewPassword
+	}
+
+	user, err := s.repo.FindUserByResetToken(FindUserByResetTokenInput{
+		UserID: input.UserID,
+		Token:  input.Token,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to find user by reset token: %w", err)
+	}
+	if user == nil {
+		return ErrInvalidOrExpiredResetToken
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	err = s.repo.UpdatePassword(UpdatePasswordInput{
+		UserID:       input.UserID,
+		PasswordHash: string(hashedPassword),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	slog.Info("password reset successfully", "user_id", input.UserID)
 
 	return nil
 }

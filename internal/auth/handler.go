@@ -25,7 +25,8 @@ func (h *AuthHandler) RegisterRoutes(router *gin.RouterGroup, rateLimiter *middl
 	router.POST("/auth/login", rateLimiter.AuthStrict(), h.Login)
 	router.POST("/auth/verify", rateLimiter.AuthStrict(), h.VerifyEmail)
 	router.POST("/auth/resend-verify", rateLimiter.Global(), h.ResendVerification)
-
+	router.POST("/auth/forgot-password", h.ForgotPassword)
+	router.POST("/auth/reset-password", h.ResetPassword)
 }
 
 // Register handles POST /auth/register.
@@ -190,14 +191,15 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 // @Tags         auth
 // @Produce      json
 // @Security     BearerAuth
+// @Param		body ResendVerificationInput true "Resend verification email"
 // @Success      200  {object}  map[string]interface{}
 // @Failure      401  {object}  map[string]interface{}
 // @Failure      409  {object}  map[string]interface{}
 // @Router       /auth/resend-verify [post]
 func (h *AuthHandler) ResendVerification(c *gin.Context) {
-	userID, exists := c.Get("userID")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	var input ResendVerificationInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
@@ -207,7 +209,7 @@ func (h *AuthHandler) ResendVerification(c *gin.Context) {
 	}
 
 	err := h.svc.ResendVerification(c.Request.Context(), ResendVerificationInput{
-		UserID: userID.(string),
+		Email: input.Email,
 	})
 
 	if err != nil {
@@ -229,4 +231,118 @@ func (h *AuthHandler) ResendVerification(c *gin.Context) {
 	res.Success = true
 	res.Message = "Verification email sent successfully"
 	c.JSON(http.StatusOK, gin.H{"response": res})
+}
+
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+// ForgotPassword handles POST /auth/forgot-password.
+// @Summary      Request password reset
+// @Description  Sends a password reset email if the account exists
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body body ForgotPasswordRequest true "Forgot Password details"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      400  {object}  map[string]interface{}
+// @Failure      500  {object}  map[string]interface{}
+// @Router       /auth/forgot-password [post]
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	err := h.svc.ForgotPassword(c.Request.Context(), ForgotPasswordInput{Email: req.Email})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.ApiResponse{
+		Success: true,
+		Message: "If that email is registered you will receive a reset link shortly",
+	})
+}
+
+type ResetPasswordRequest struct {
+	UserID      string `json:"user_id"`
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}
+
+// ResetPassword handles POST /auth/reset-password.
+// @Summary      Reset password
+// @Description  Resets a user password using a valid token
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        token query string false "Reset token"
+// @Param        user_id query string false "User ID"
+// @Param        body body ResetPasswordRequest true "Reset Password details"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      400  {object}  map[string]interface{}
+// @Failure      500  {object}  map[string]interface{}
+// @Router       /auth/reset-password [post]
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	token := c.Query("token")
+	userID := c.Query("user_id")
+
+	var req ResetPasswordRequest
+
+	res := models.ApiResponse{
+		Success: false,
+		Message: "Invalid Request",
+	}
+
+	if err := c.ShouldBindJSON(&req); err == nil {
+		if token == "" {
+			token = req.Token
+		}
+		if userID == "" {
+			userID = req.UserID
+		}
+	} else if token == "" || userID == "" {
+		res.Error = "invalid request body"
+		c.JSON(http.StatusBadRequest, res)
+		return
+	}
+
+	if token == "" || userID == "" {
+		res.Error = "token and user_id are required"
+		c.JSON(http.StatusBadRequest, res)
+		return
+	}
+
+	if req.NewPassword == "" {
+		res.Error = "new_password is required"
+		c.JSON(http.StatusBadRequest, res)
+		return
+	}
+
+	err := h.svc.ResetPassword(c.Request.Context(), ResetPasswordInput{
+		UserID:      userID,
+		Token:       token,
+		NewPassword: req.NewPassword,
+	})
+
+	if err != nil {
+		if errors.Is(err, ErrInvalidOrExpiredResetToken) || errors.Is(err, ErrInvalidNewPassword) {
+			c.JSON(http.StatusBadRequest, models.ApiResponse{
+				Success: false,
+				Message: "Password reset failed",
+				Error:   err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.ApiResponse{
+		Success: true,
+		Message: "Password reset successfully",
+	})
 }

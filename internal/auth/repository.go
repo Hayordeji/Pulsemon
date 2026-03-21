@@ -151,3 +151,58 @@ func (r *AuthRepository) SetVerified(input SetVerifiedInput) error {
 			"token_expires_at":   gorm.Expr("NULL"),
 		}).Error
 }
+
+// SetResetTokenInput holds data to set the reset token.
+type SetResetTokenInput struct {
+	UserID    string
+	Token     string
+	ExpiresAt time.Time
+}
+
+// SetResetToken sets the reset token and expiry for a user.
+func (r *AuthRepository) SetResetToken(input SetResetTokenInput) error {
+	return r.db.Model(&models.User{}).
+		Where("id = ?", input.UserID).
+		Updates(map[string]interface{}{
+			"verification_token": input.Token,
+			"token_expires_at":   input.ExpiresAt,
+		}).Error
+}
+
+// FindUserByResetTokenInput holds data for finding a user by reset token.
+type FindUserByResetTokenInput struct {
+	UserID string
+	Token  string
+}
+
+// FindUserByResetToken retrieves a user by a reset token that hasn't expired.
+func (r *AuthRepository) FindUserByResetToken(input FindUserByResetTokenInput) (*models.User, error) {
+	var user models.User
+	err := r.db.Where("id = ? AND verification_token = ? AND token_expires_at > ?", input.UserID, input.Token, time.Now()).First(&user).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+// UpdatePasswordInput holds data to update a user's password.
+type UpdatePasswordInput struct {
+	UserID       string
+	PasswordHash string
+}
+
+// UpdatePassword updates a user's password and clears the verification token.
+func (r *AuthRepository) UpdatePassword(input UpdatePasswordInput) error {
+	return r.db.Model(&models.User{}).
+		Where("id = ?", input.UserID).
+		Updates(map[string]interface{}{
+			"password_hash":      input.PasswordHash,
+			"verification_token": gorm.Expr("NULL"),
+			"token_expires_at":   gorm.Expr("NULL"),
+		}).Error
+}

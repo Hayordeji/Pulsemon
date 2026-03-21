@@ -60,9 +60,9 @@ func (e *AlertEngine) SendAlert(ctx context.Context, input SendAlertInput) error
 		// A previous alert exists — check if it's within the cooldown window.
 		cooldownCutoff := time.Now().Add(-time.Duration(e.cooldownMinutes) * time.Minute)
 		if lastAlert.SentAt.After(cooldownCutoff) {
-			slog.Info("alert suppressed by cooldown",
-				"service_id", input.ServiceID,
-				"alert_type", input.AlertType)
+			// slog.Info("alert suppressed by cooldown",
+			// 	"service_id", input.ServiceID,
+			// 	"alert_type", input.AlertType)
 			return nil
 		}
 	}
