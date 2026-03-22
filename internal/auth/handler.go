@@ -150,42 +150,46 @@ type RefreshRequest struct {
 // @Router       /auth/refresh [post]
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req RefreshRequest
+
+	res := models.ApiResponse{
+		Message: "Refresh token failed",
+		Success: false,
+		Error:   "",
+		Data:    nil,
+	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		res.Message = "Invalid request body"
+		c.JSON(http.StatusBadRequest, res)
 		return
 	}
 
 	if req.RefreshToken == "" {
-		c.JSON(http.StatusBadRequest, models.ApiResponse{
-			Success: false,
-			Message: "Invalid request",
-			Error:   "refresh_token is required",
-		})
+		res.Error = "refresh_token is required"
+		c.JSON(http.StatusBadRequest, res)
 		return
 	}
 
 	tokenPair, err := h.svc.Refresh(c.Request.Context(), RefreshInput{RefreshToken: req.RefreshToken})
 	if err != nil {
 		if errors.Is(err, ErrInvalidRefreshToken) {
-			c.JSON(http.StatusUnauthorized, models.ApiResponse{
-				Success: false,
-				Message: "Unauthorized",
-				Error:   err.Error(),
-			})
+			res.Error = err.Error()
+			c.JSON(http.StatusUnauthorized, res)
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		res.Message = "Internal server error"
+		res.Error = err.Error()
+		c.JSON(http.StatusInternalServerError, res)
 		return
 	}
 
-	c.JSON(http.StatusOK, models.ApiResponse{
-		Success: true,
-		Message: "Token refreshed successfully",
-		Data: gin.H{
-			"jwt":           tokenPair.JWT,
-			"refresh_token": tokenPair.RefreshToken,
-		},
-	})
+	res.Success = true
+	res.Message = "Token refreshed successfully"
+	res.Data = gin.H{
+		"jwt":           tokenPair.JWT,
+		"refresh_token": tokenPair.RefreshToken,
+	}
+	c.JSON(http.StatusOK, res)
 }
 
 // VerifyEmail handles POST /auth/verify.
