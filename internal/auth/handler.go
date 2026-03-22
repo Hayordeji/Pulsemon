@@ -27,6 +27,7 @@ func (h *AuthHandler) RegisterRoutes(router *gin.RouterGroup, rateLimiter *middl
 	router.POST("/auth/resend-verify", rateLimiter.Global(), h.ResendVerification)
 	router.POST("/auth/forgot-password", h.ForgotPassword)
 	router.POST("/auth/reset-password", h.ResetPassword)
+	router.POST("/auth/refresh", h.Refresh)
 }
 
 // Register handles POST /auth/register.
@@ -107,7 +108,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Data:    nil,
 	}
 
-	token, err := h.svc.Login(c.Request.Context(), input)
+	tokenPair, err := h.svc.Login(c.Request.Context(), input)
 	if err != nil {
 		if errors.Is(err, ErrInvalidCredentials) {
 			res.Error = err.Error()
@@ -125,7 +126,69 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	res.Success = true
 	res.Message = "Login successful"
-	res.Data = token
+	res.Data = gin.H{
+		"jwt":           tokenPair.JWT,
+		"refresh_token": tokenPair.RefreshToken,
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+// Refresh handles POST /api/v1/auth/refresh.
+// @Summary      Refresh token
+// @Description  Uses a refresh token to get a new pair of access and refresh tokens
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body body RefreshRequest true "Refresh token"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      400  {object}  map[string]interface{}
+// @Failure      401  {object}  map[string]interface{}
+// @Router       /auth/refresh [post]
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	var req RefreshRequest
+
+	res := models.ApiResponse{
+		Message: "Refresh token failed",
+		Success: false,
+		Error:   "",
+		Data:    nil,
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		res.Message = "Invalid request body"
+		c.JSON(http.StatusBadRequest, res)
+		return
+	}
+
+	if req.RefreshToken == "" {
+		res.Error = "refresh_token is required"
+		c.JSON(http.StatusBadRequest, res)
+		return
+	}
+
+	tokenPair, err := h.svc.Refresh(c.Request.Context(), RefreshInput{RefreshToken: req.RefreshToken})
+	if err != nil {
+		if errors.Is(err, ErrInvalidRefreshToken) {
+			res.Error = err.Error()
+			c.JSON(http.StatusUnauthorized, res)
+			return
+		}
+		res.Message = "Internal server error"
+		res.Error = err.Error()
+		c.JSON(http.StatusInternalServerError, res)
+		return
+	}
+
+	res.Success = true
+	res.Message = "Token refreshed successfully"
+	res.Data = gin.H{
+		"jwt":           tokenPair.JWT,
+		"refresh_token": tokenPair.RefreshToken,
+	}
 	c.JSON(http.StatusOK, res)
 }
 

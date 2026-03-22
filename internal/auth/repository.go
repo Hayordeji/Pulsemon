@@ -206,3 +206,55 @@ func (r *AuthRepository) UpdatePassword(input UpdatePasswordInput) error {
 			"token_expires_at":   gorm.Expr("NULL"),
 		}).Error
 }
+
+// SetRefreshTokenInput holds data to set the refresh token.
+type SetRefreshTokenInput struct {
+	UserID string
+	Token  string
+	Expiry time.Time
+}
+
+// SetRefreshToken sets the refresh token and expiry for a user.
+func (r *AuthRepository) SetRefreshToken(input SetRefreshTokenInput) error {
+	return r.db.Model(&models.User{}).
+		Where("id = ?", input.UserID).
+		Updates(map[string]interface{}{
+			"refresh_token":        input.Token,
+			"refresh_token_expiry": input.Expiry,
+		}).Error
+}
+
+// FindByRefreshTokenInput holds data for finding a user by refresh token.
+type FindByRefreshTokenInput struct {
+	Token string
+}
+
+// FindUserByRefreshToken retrieves a user by a refresh token that hasn't expired.
+func (r *AuthRepository) FindUserByRefreshToken(input FindByRefreshTokenInput) (*models.User, error) {
+	var user models.User
+	err := r.db.Where("refresh_token = ? AND refresh_token_expiry > ?", input.Token, time.Now()).First(&user).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil // Return nil, nil if not found or expired
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+// ClearRefreshTokenInput holds data to clear a user's refresh token.
+type ClearRefreshTokenInput struct {
+	UserID string
+}
+
+// ClearRefreshToken clears a user's refresh token and expiry.
+func (r *AuthRepository) ClearRefreshToken(input ClearRefreshTokenInput) error {
+	return r.db.Model(&models.User{}).
+		Where("id = ?", input.UserID).
+		Updates(map[string]interface{}{
+			"refresh_token":        gorm.Expr("NULL"),
+			"refresh_token_expiry": gorm.Expr("NULL"),
+		}).Error
+}
