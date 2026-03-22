@@ -129,6 +129,7 @@ func (h *ServiceHandler) ListServices(c *gin.Context) {
 		summaries[i] = ToServiceSummaryResponse(s)
 	}
 
+	res.Success = true
 	res.Message = "Services retrieved successfully"
 	res.Data = summaries
 	c.JSON(http.StatusOK, gin.H{"response": res})
@@ -173,6 +174,7 @@ func (h *ServiceHandler) GetService(c *gin.Context) {
 		return
 	}
 
+	res.Success = true
 	res.Message = "Service retrieved successfully"
 	res.Data = ToServiceDetailResponse(*service)
 	c.JSON(http.StatusOK, gin.H{"response": res})

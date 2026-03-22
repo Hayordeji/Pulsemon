@@ -27,6 +27,7 @@ func (h *AuthHandler) RegisterRoutes(router *gin.RouterGroup, rateLimiter *middl
 	router.POST("/auth/resend-verify", rateLimiter.Global(), h.ResendVerification)
 	router.POST("/auth/forgot-password", h.ForgotPassword)
 	router.POST("/auth/reset-password", h.ResetPassword)
+	router.POST("/auth/refresh", h.Refresh)
 }
 
 // Register handles POST /auth/register.
@@ -107,7 +108,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Data:    nil,
 	}
 
-	token, err := h.svc.Login(c.Request.Context(), input)
+	tokenPair, err := h.svc.Login(c.Request.Context(), input)
 	if err != nil {
 		if errors.Is(err, ErrInvalidCredentials) {
 			res.Error = err.Error()
@@ -125,8 +126,66 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	res.Success = true
 	res.Message = "Login successful"
-	res.Data = token
+	res.Data = gin.H{
+		"jwt":           tokenPair.JWT,
+		"refresh_token": tokenPair.RefreshToken,
+	}
 	c.JSON(http.StatusOK, res)
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+// Refresh handles POST /api/v1/auth/refresh.
+// @Summary      Refresh token
+// @Description  Uses a refresh token to get a new pair of access and refresh tokens
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body body RefreshRequest true "Refresh token"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      400  {object}  map[string]interface{}
+// @Failure      401  {object}  map[string]interface{}
+// @Router       /auth/refresh [post]
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	var req RefreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	if req.RefreshToken == "" {
+		c.JSON(http.StatusBadRequest, models.ApiResponse{
+			Success: false,
+			Message: "Invalid request",
+			Error:   "refresh_token is required",
+		})
+		return
+	}
+
+	tokenPair, err := h.svc.Refresh(c.Request.Context(), RefreshInput{RefreshToken: req.RefreshToken})
+	if err != nil {
+		if errors.Is(err, ErrInvalidRefreshToken) {
+			c.JSON(http.StatusUnauthorized, models.ApiResponse{
+				Success: false,
+				Message: "Unauthorized",
+				Error:   err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.ApiResponse{
+		Success: true,
+		Message: "Token refreshed successfully",
+		Data: gin.H{
+			"jwt":           tokenPair.JWT,
+			"refresh_token": tokenPair.RefreshToken,
+		},
+	})
 }
 
 // VerifyEmail handles POST /auth/verify.
