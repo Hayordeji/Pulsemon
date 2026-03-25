@@ -5,6 +5,7 @@ import (
 	"Pulsemon/pkg/models"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -75,6 +76,12 @@ func (h *ServiceHandler) CreateService(c *gin.Context) {
 	service, err := h.svc.CreateService(userID, input)
 	if err != nil {
 		switch {
+		case strings.Contains(err.Error(), "already exists"):
+			c.JSON(http.StatusConflict, models.ApiResponse{
+				Success: false,
+				Message: "Conflict",
+				Error:   err.Error(),
+			})
 		case errors.Is(err, ErrServiceLimitReached):
 			res.Error = err.Error()
 			c.JSON(http.StatusTooManyRequests, gin.H{"response": res})
@@ -124,14 +131,14 @@ func (h *ServiceHandler) ListServices(c *gin.Context) {
 		return
 	}
 
-	summaries := make([]ServiceSummaryResponse, len(services))
-	for i, s := range services {
-		summaries[i] = ToServiceSummaryResponse(s)
-	}
+	// summaries := make([]ServiceSummaryResponse, len(services))
+	// for i, s := range services {
+	// 	summaries[i] = ToServiceSummaryResponse(s)
+	// }
 
 	res.Success = true
 	res.Message = "Services retrieved successfully"
-	res.Data = summaries
+	res.Data = services
 	c.JSON(http.StatusOK, gin.H{"response": res})
 }
 

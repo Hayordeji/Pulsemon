@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"Pulsemon/pkg/models"
@@ -99,7 +100,12 @@ func (s *ServiceService) CreateService(userID string, input CreateServiceInput) 
 	}
 
 	if err := s.repo.Create(service); err != nil {
-		return nil, err
+		// Check for unique constraint violation
+		if strings.Contains(err.Error(), "23505") ||
+			strings.Contains(err.Error(), "uq_services_user_url") {
+			return nil, errors.New("a service with this URL already exists")
+		}
+		return nil, fmt.Errorf("failed to create service: %w", err)
 	}
 
 	// Notify the scheduler that a new service was created.
@@ -116,8 +122,18 @@ func (s *ServiceService) CreateService(userID string, input CreateServiceInput) 
 }
 
 // GetServices returns all services belonging to the given user.
-func (s *ServiceService) GetServices(userID string) ([]models.Service, error) {
-	return s.repo.FindAllByUser(userID)
+func (s *ServiceService) GetServices(userID string) ([]ServiceSummaryResponse, error) {
+	services, err := s.repo.FindAllByUser(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	summaries := make([]ServiceSummaryResponse, len(services))
+	for i, s := range services {
+		summaries[i] = ToServiceSummaryResponse(s)
+	}
+
+	return summaries, nil
 }
 
 // GetServiceByID returns a single service by ID, scoped to the given user.
