@@ -23,7 +23,7 @@ func NewAuthHandler(svc *AuthService) *AuthHandler {
 func (h *AuthHandler) RegisterRoutes(router *gin.RouterGroup, rateLimiter *middleware.RateLimiter, jwtSecret string) {
 	router.POST("/auth/register", rateLimiter.AuthStrict(), h.Register)
 	router.POST("/auth/login", rateLimiter.AuthStrict(), h.Login)
-	router.POST("/auth/verify", rateLimiter.AuthStrict(), h.VerifyEmail)
+	router.GET("/auth/verify", rateLimiter.AuthStrict(), h.VerifyEmail)
 	router.POST("/auth/resend-verify", rateLimiter.Global(), h.ResendVerification)
 	router.POST("/auth/forgot-password", h.ForgotPassword)
 	router.POST("/auth/reset-password", h.ResetPassword)
@@ -198,8 +198,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 // @Tags         auth
 // @Accept       json
 // @Produce      json
-// @Param        token query string false "Verification token"
-// @Param        body body VerifyEmailInput false "Verification token (alternative to query param)"
+// @Param        body body VerifyEmailInput false "Verification token "
 // @Success      200  {object}  map[string]interface{}
 // @Failure      400  {object}  map[string]interface{}
 // @Failure      409  {object}  map[string]interface{}
