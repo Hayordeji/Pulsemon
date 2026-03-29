@@ -14,16 +14,16 @@ import (
 // the correct HTTP status code.
 var (
 	ErrServiceLimitReached = errors.New("service limit reached: maximum 3 active services allowed")
-	ErrInvalidInterval     = errors.New("invalid interval: must be one of 30s, 1m, 5m, 10m, 30m")
+	ErrInvalidInterval     = errors.New("invalid interval: must be one of 10m, 30m")
 	ErrInvalidURL          = errors.New("invalid URL: must start with http:// or https://")
 	ErrServiceNotFound     = errors.New("service not found")
 )
 
 // validIntervals is the set of accepted probe intervals.
 var validIntervals = map[string]bool{
-	"30s": true,
-	"1m":  true,
-	"5m":  true,
+	// "30s": true,
+	// "1m":  true,
+	// "5m":  true,
 	"10m": true,
 	"30m": true,
 }

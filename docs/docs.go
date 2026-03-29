@@ -345,13 +345,7 @@ const docTemplate = `{
                 "summary": "Verify user email",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Verification token",
-                        "name": "token",
-                        "in": "query"
-                    },
-                    {
-                        "description": "Verification token (alternative to query param)",
+                        "description": "Verification token ",
                         "name": "body",
                         "in": "body",
                         "schema": {

@@ -475,11 +475,7 @@ paths:
       - application/json
       description: Verifies a user's email using the token sent to their inbox
       parameters:
-      - description: Verification token
-        in: query
-        name: token
-        type: string
-      - description: Verification token (alternative to query param)
+      - description: 'Verification token '
         in: body
         name: body
         schema:
