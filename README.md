@@ -227,12 +227,6 @@ Authorization: Bearer <jwt_token>
 
 ---
 
-
-
-## License
-
-MIT License — see [LICENSE](LICENSE) for details.
-
 ---
 
 ## Author
