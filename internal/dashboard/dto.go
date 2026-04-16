@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -125,13 +126,13 @@ func ToDashboardResponse(service models.Service, results []models.ProbeResult, l
 		ServiceID:        service.ID.String(),
 		Name:             service.Name,
 		CurrentStatus:    service.CurrentStatus,
-		UptimePercentage: service.SLAPercentage,
+		UptimePercentage: math.Ceil(service.SLAPercentage*100) / 100,
 		SLATarget:        service.SLATarget,
 		SLABreached:      service.SLAPercentage < service.SLATarget,
 		FailureStreak:    service.FailureStreak,
-		AvgLatencyMs:     service.AvgLatencyMs,
-		P95LatencyMs:     service.P95LatencyMs,
-		P99LatencyMs:     service.P99LatencyMs,
+		AvgLatencyMs:     math.Ceil(service.AvgLatencyMs*100) / 100,
+		P95LatencyMs:     math.Ceil(service.P95LatencyMs*100) / 100,
+		P99LatencyMs:     math.Ceil(service.P99LatencyMs*100) / 100,
 		LastCheckedAt:    service.LastCheckedAt,
 	}
 
@@ -159,7 +160,7 @@ func ToDashboardResponse(service models.Service, results []models.ProbeResult, l
 		recentResults[i] = RecentResultResponse{
 			CheckedAt:  r.CheckedAt,
 			StatusCode: r.StatusCode,
-			LatencyMs:  r.LatencyMs,
+			LatencyMs:  math.Ceil(r.LatencyMs*100) / 100,
 			IsSuccess:  r.IsSuccess,
 		}
 	}

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"math"
 	"strings"
 	"time"
 
@@ -77,7 +78,7 @@ func ToServiceSummaryResponse(s models.Service) ServiceSummaryResponse {
 		URL:           s.URL,
 		Interval:      s.Interval,
 		CurrentStatus: s.CurrentStatus,
-		SLAPercentage: s.SLAPercentage,
+		SLAPercentage: math.Ceil(s.SLAPercentage*100) / 100,
 		LastCheckedAt: s.LastCheckedAt,
 	}
 }
@@ -97,10 +98,10 @@ func ToServiceDetailResponse(s models.Service) ServiceDetailResponse {
 		CurrentStatus:    s.CurrentStatus,
 		LastCheckedAt:    s.LastCheckedAt,
 		FailureStreak:    s.FailureStreak,
-		AvgLatencyMs:     s.AvgLatencyMs,
-		P95LatencyMs:     s.P95LatencyMs,
-		P99LatencyMs:     s.P99LatencyMs,
-		SLAPercentage:    s.SLAPercentage,
+		AvgLatencyMs:     math.Ceil(s.AvgLatencyMs*100) / 100,
+		P95LatencyMs:     math.Ceil(s.P95LatencyMs*100) / 100,
+		P99LatencyMs:     math.Ceil(s.P99LatencyMs*100) / 100,
+		SLAPercentage:    math.Ceil(s.SLAPercentage*100) / 100,
 		TotalChecks:      s.TotalChecks,
 		SuccessfulChecks: s.SuccessfulChecks,
 		CreatedAt:        s.CreatedAt,

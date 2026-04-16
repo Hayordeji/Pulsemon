@@ -46,7 +46,7 @@ func (s *AdminSeeder) Seed(ctx context.Context) error {
 	var user models.User
 	err := s.db.WithContext(ctx).Table("users").Where("email = ?", s.cfg.AdminEmail).First(&user).Error
 	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
 	} else {
