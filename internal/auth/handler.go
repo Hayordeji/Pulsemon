@@ -192,7 +192,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
-// VerifyEmail handles POST /auth/verify.
+// VerifyEmail handles GET /auth/verify.
 // @Summary      Verify user email
 // @Description  Verifies a user's email using the token sent to their inbox
 // @Tags         auth
@@ -202,7 +202,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 // @Success      200  {object}  map[string]interface{}
 // @Failure      400  {object}  map[string]interface{}
 // @Failure      409  {object}  map[string]interface{}
-// @Router       /auth/verify [post]
+// @Router       /auth/verify [get]
 func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	token := c.Query("token")
 	user_id := c.Query("user_id")

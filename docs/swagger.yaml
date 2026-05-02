@@ -470,7 +470,7 @@ paths:
       tags:
       - auth
   /auth/verify:
-    post:
+    get:
       consumes:
       - application/json
       description: Verifies a user's email using the token sent to their inbox
