@@ -331,7 +331,7 @@ const docTemplate = `{
             }
         },
         "/auth/verify": {
-            "post": {
+            "get": {
                 "description": "Verifies a user's email using the token sent to their inbox",
                 "consumes": [
                     "application/json"
