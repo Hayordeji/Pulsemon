@@ -229,7 +229,7 @@ func (s *AuthService) Refresh(ctx context.Context, input RefreshInput) (*TokenPa
 
 // sendVerificationEmail sends a verification email using Resend
 func (s *AuthService) sendVerificationEmail(email string, userID string, token string) {
-	url := fmt.Sprintf("%s/api/v1/auth/verify?token=%s&user_id=%s", s.cfg.AppBaseURL, token, userID)
+	url := fmt.Sprintf("%sverify?token=%s&user_id=%s", s.cfg.AppBaseURL, token, userID)
 
 	// body := fmt.Sprintf("Welcome to Pulsemon!\n\n"+
 	// 	"Please verify your email by clicking the link below:\n"+
