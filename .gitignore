@@ -29,6 +29,5 @@ tmp/
 /misc
 
 .env.prod
-__debug_bin.exe2061105147
 *__debug_bin.exe
 /.claude
