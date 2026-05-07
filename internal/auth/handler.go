@@ -30,6 +30,12 @@ func (h *AuthHandler) RegisterRoutes(router *gin.RouterGroup, rateLimiter *middl
 	router.POST("/auth/refresh", h.Refresh)
 }
 
+// RegisterProtectedRoutes wires up auth routes that require JWT authentication.
+func (h *AuthHandler) RegisterProtectedRoutes(router *gin.RouterGroup) {
+	router.PATCH("/auth/account", h.UpdateAccount)
+	router.DELETE("/auth/account", h.DeleteAccount)
+}
+
 // Register handles POST /auth/register.
 // @Summary      Register a new user account
 // @Description  Creates a new user account with email and password
@@ -405,5 +411,139 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	c.JSON(http.StatusOK, models.ApiResponse{
 		Success: true,
 		Message: "Password reset successfully",
+	})
+}
+
+type UpdateAccountRequest struct {
+	Username string `json:"username"`
+}
+
+// UpdateAccount handles PATCH /auth/account.
+// @Summary      Update account
+// @Description  Updates the authenticated user's username
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body body UpdateAccountRequest true "Update details"
+// @Success      200  {object}  models.ApiResponse
+// @Failure      400  {object}  models.ApiResponse
+// @Failure      401  {object}  models.ApiResponse
+// @Failure      409  {object}  models.ApiResponse
+// @Router       /auth/account [patch]
+func (h *AuthHandler) UpdateAccount(c *gin.Context) {
+	userID := c.GetString("userID")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, models.ApiResponse{
+			Success: false,
+			Message: "Unauthorized",
+			Error:   "user not authenticated",
+		})
+		return
+	}
+
+	var req UpdateAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ApiResponse{
+			Success: false,
+			Message: "Invalid request",
+			Error:   "invalid request body",
+		})
+		return
+	}
+
+	if req.Username == "" {
+		c.JSON(http.StatusBadRequest, models.ApiResponse{
+			Success: false,
+			Message: "Invalid request",
+			Error:   "username is required",
+		})
+		return
+	}
+
+	err := h.svc.UpdateUsername(c.Request.Context(), UpdateUsernameInput{
+		UserID:   userID,
+		Username: req.Username,
+	})
+
+	if err != nil {
+		if errors.Is(err, ErrInvalidUsername) {
+			c.JSON(http.StatusBadRequest, models.ApiResponse{
+				Success: false,
+				Message: "Update failed",
+				Error:   err.Error(),
+			})
+			return
+		}
+		if errors.Is(err, ErrUsernameTaken) {
+			c.JSON(http.StatusConflict, models.ApiResponse{
+				Success: false,
+				Message: "Update failed",
+				Error:   err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ApiResponse{
+			Success: false,
+			Message: "Update failed",
+			Error:   "internal server error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.ApiResponse{
+		Success: true,
+		Message: "Account updated successfully",
+	})
+}
+
+// DeleteAccount handles DELETE /auth/account.
+// @Summary      Delete account
+// @Description  Permanently deletes the authenticated user's account
+//
+//	and all associated services, probe results and alerts
+//
+// @Tags         auth
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  models.ApiResponse
+// @Failure      401  {object}  models.ApiResponse
+// @Failure      404  {object}  models.ApiResponse
+// @Router       /auth/account [delete]
+func (h *AuthHandler) DeleteAccount(c *gin.Context) {
+	userID := c.GetString("userID")
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, models.ApiResponse{
+			Success: false,
+			Message: "Unauthorized",
+			Error:   "user not authenticated",
+		})
+		return
+	}
+
+	err := h.svc.DeleteAccount(c.Request.Context(), DeleteAccountInput{
+		UserID: userID,
+	})
+
+	if err != nil {
+		if err.Error() == "user not found" {
+			c.JSON(http.StatusNotFound, models.ApiResponse{
+				Success: false,
+				Message: "Delete failed",
+				Error:   err.Error(),
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ApiResponse{
+			Success: false,
+			Message: "Delete failed",
+			Error:   "internal server error",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.ApiResponse{
+		Success: true,
+		Message: "Account deleted successfully",
 	})
 }

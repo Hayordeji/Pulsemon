@@ -213,6 +213,7 @@ func main() {
 	{
 		dashboardHandler.RegisterRoutes(api, rateLimiter)
 		serviceHandler.RegisterRoutes(api, rateLimiter)
+		authHandler.RegisterProtectedRoutes(api)
 	}
 
 	// Admin route group

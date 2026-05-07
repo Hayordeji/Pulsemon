@@ -27,6 +27,8 @@ var (
 	ErrInvalidOrExpiredResetToken = errors.New("invalid or expired reset token")
 	ErrInvalidNewPassword         = errors.New("password must be at least 8 characters")
 	ErrInvalidRefreshToken        = errors.New("invalid or expired refresh token")
+	ErrUsernameTaken              = errors.New("username is already taken")
+	ErrInvalidUsername            = errors.New("username must be between 3 and 50 characters")
 )
 
 type AuthService struct {
@@ -225,6 +227,76 @@ func (s *AuthService) Refresh(ctx context.Context, input RefreshInput) (*TokenPa
 		JWT:          newJWTToken,
 		RefreshToken: newRefreshToken,
 	}, nil
+}
+
+// UpdateUsernameInput holds data for updating a user's username.
+type UpdateUsernameInput struct {
+	UserID   string
+	Username string
+}
+
+// UpdateUsername updates the authenticated user's username.
+func (s *AuthService) UpdateUsername(ctx context.Context, input UpdateUsernameInput) error {
+	username := strings.TrimSpace(input.Username)
+
+	if len(username) < 3 || len(username) > 50 {
+		return ErrInvalidUsername
+	}
+
+	// Only allow letters, numbers, underscores, hyphens
+	for _, c := range username {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') || c == '_' || c == '-') {
+			return errors.New("username may only contain letters, numbers, underscores and hyphens")
+		}
+	}
+
+	existing, err := s.repo.FindUserByUsername(FindByUsernameInput{Username: username})
+	if err != nil {
+		return fmt.Errorf("failed to check username availability: %w", err)
+	}
+	if existing != nil && existing.ID.String() != input.UserID {
+		return ErrUsernameTaken
+	}
+
+	err = s.repo.UpdateUsername(UpdateUsernameRepoInput{
+		UserID:   input.UserID,
+		Username: username,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update username: %w", err)
+	}
+
+	slog.Info("username updated successfully",
+		"user_id", input.UserID)
+
+	return nil
+}
+
+// DeleteAccountInput holds data for deleting a user account.
+type DeleteAccountInput struct {
+	UserID string
+}
+
+// DeleteAccount permanently deletes the authenticated user and all associated data.
+func (s *AuthService) DeleteAccount(ctx context.Context, input DeleteAccountInput) error {
+	user, err := s.repo.FindUserByID(FindUserByIDInput{UserID: input.UserID})
+	if err != nil {
+		return fmt.Errorf("failed to find user: %w", err)
+	}
+	if user == nil {
+		return errors.New("user not found")
+	}
+
+	err = s.repo.DeleteUser(DeleteUserInput{UserID: input.UserID})
+	if err != nil {
+		return fmt.Errorf("failed to delete account: %w", err)
+	}
+
+	slog.Info("account deleted successfully",
+		"user_id", input.UserID)
+
+	return nil
 }
 
 // sendVerificationEmail sends a verification email using Resend
@@ -795,13 +867,13 @@ func returnForgotPasswordHtmlBody(username *string, email *string, url *string) 
                                text-transform:uppercase;
                                font-family:-apple-system,BlinkMacSystemFont,
                                'Segoe UI',Helvetica,Arial,sans-serif;">
-                      Account Security
+                      	Account Security
                     </p>
                     <p style="margin:0 0 20px 0;color:#ffffff;font-size:22px;
                                font-weight:700;letter-spacing:-0.4px;line-height:1.3;
                                font-family:-apple-system,BlinkMacSystemFont,
                                'Segoe UI',Helvetica,Arial,sans-serif;">
-                      Reset your password
+                      {{USERNAME}} - Reset your password
                     </p>
 
                     <!-- Divider -->
@@ -952,7 +1024,8 @@ func returnForgotPasswordHtmlBody(username *string, email *string, url *string) 
 	`
 
 	body = strings.ReplaceAll(body, "{{URL}}", *url)
-	body = strings.ReplaceAll(body, "{{EMAIL}}", strings.ToUpper(*username))
+	body = strings.ReplaceAll(body, "{{EMAIL}}", strings.ToUpper(*email))
+	body = strings.ReplaceAll(body, "{{USERNAME}}", strings.ToUpper(*username))
 
 	return body
 }

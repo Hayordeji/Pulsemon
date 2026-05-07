@@ -40,6 +40,11 @@ definitions:
       user_id:
         type: string
     type: object
+  auth.UpdateAccountRequest:
+    properties:
+      username:
+        type: string
+    type: object
   auth.VerifyEmailInput:
     properties:
       token:
@@ -130,6 +135,16 @@ definitions:
         $ref: '#/definitions/dashboard.PaginationMeta'
       service_id:
         type: string
+    type: object
+  models.ApiResponse:
+    properties:
+      data: {}
+      error:
+        type: string
+      message:
+        type: string
+      success:
+        type: boolean
     type: object
   services.CreateServiceInput:
     properties:
@@ -259,6 +274,64 @@ info:
   title: Pulsemon
   version: "1.0"
 paths:
+  /auth/account:
+    delete:
+      description: Permanently deletes the authenticated user's account
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ApiResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete account
+      tags:
+      - auth
+    patch:
+      consumes:
+      - application/json
+      description: Updates the authenticated user's username
+      parameters:
+      - description: Update details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.UpdateAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ApiResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ApiResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ApiResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/models.ApiResponse'
+      security:
+      - BearerAuth: []
+      summary: Update account
+      tags:
+      - auth
   /auth/forgot-password:
     post:
       consumes:

@@ -258,3 +258,64 @@ func (r *AuthRepository) ClearRefreshToken(input ClearRefreshTokenInput) error {
 			"refresh_token_expiry": gorm.Expr("NULL"),
 		}).Error
 }
+
+// UpdateUsernameRepoInput holds data for updating a user's username.
+type UpdateUsernameRepoInput struct {
+	UserID   string
+	Username string
+}
+
+// UpdateUsername updates a user's username.
+func (r *AuthRepository) UpdateUsername(input UpdateUsernameRepoInput) error {
+	return r.db.Model(&models.User{}).
+		Where("id = ?", input.UserID).
+		Updates(map[string]interface{}{
+			"username":   input.Username,
+			"updated_at": time.Now(),
+		}).Error
+}
+
+// DeleteUserInput holds data for deleting a user and all associated data.
+type DeleteUserInput struct {
+	UserID string
+}
+
+// DeleteUser performs a hard delete of a user and all associated data
+// in the correct order to respect foreign key constraints.
+func (r *AuthRepository) DeleteUser(input DeleteUserInput) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ?", input.UserID).Delete(&models.Alert{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", input.UserID).Delete(&models.ProbeResult{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", input.UserID).Delete(&models.Service{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("id = ?", input.UserID).Delete(&models.User{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+// FindByUsernameInput holds data for finding a user by username.
+type FindByUsernameInput struct {
+	Username string
+}
+
+// FindUserByUsername retrieves a user by their username.
+func (r *AuthRepository) FindUserByUsername(input FindByUsernameInput) (*models.User, error) {
+	var user models.User
+	err := r.db.Where("username = ?", input.Username).First(&user).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
