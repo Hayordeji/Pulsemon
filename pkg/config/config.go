@@ -20,6 +20,7 @@ type Config struct {
 	JWTSecret       string
 	ResendAPIKey    string
 	ResendFromEmail string
+	ContactToEmail  string
 	WorkerPoolSize  int
 	AppEnv          string
 	AllowedOrigins  string
@@ -55,6 +56,7 @@ func Load() Config {
 		JWTSecret:       os.Getenv("JWT_SECRET"),
 		ResendAPIKey:    os.Getenv("RESEND_API_KEY"),
 		ResendFromEmail: os.Getenv("RESEND_FROM_EMAIL"),
+		ContactToEmail:  os.Getenv("CONTACT_TO_EMAIL"),
 		WorkerPoolSize:  workerPoolSize,
 		AppEnv:          os.Getenv("APP_ENV"),
 		AllowedOrigins:  os.Getenv("ALLOWED_ORIGINS"),
@@ -78,6 +80,7 @@ func (c Config) Validate() error {
 		"JWT_SECRET":        c.JWTSecret,
 		"RESEND_API_KEY":    c.ResendAPIKey,
 		"RESEND_FROM_EMAIL": c.ResendFromEmail,
+		"CONTACT_TO_EMAIL":  c.ContactToEmail,
 		"SERVER_PORT":       c.ServerPort,
 		"ALLOWED_ORIGINS":   c.AllowedOrigins,
 		"APP_BASE_URL":      c.AppBaseURL,

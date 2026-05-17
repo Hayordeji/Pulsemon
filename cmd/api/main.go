@@ -14,6 +14,7 @@ import (
 	"Pulsemon/internal/adminseeder"
 	"Pulsemon/internal/alerts"
 	"Pulsemon/internal/auth"
+	"Pulsemon/internal/contact"
 	"Pulsemon/internal/dashboard"
 	"Pulsemon/internal/health"
 	"Pulsemon/internal/keepalive"
@@ -173,6 +174,9 @@ func main() {
 	// Create health handler
 	healthHandler := health.NewHealthHandler(db)
 
+	// Create contact handler
+	contactHandler := contact.NewContactHandler(cfg.ResendAPIKey, cfg.ResendFromEmail, cfg.ContactToEmail)
+
 	// Create rate limiter
 	rateLimiter := middleware.NewRateLimiter()
 
@@ -202,6 +206,7 @@ func main() {
 	v1 := router.Group("/api/v1")
 	{
 		healthHandler.RegisterRoutes(v1)
+		contactHandler.RegisterRoutes(v1)
 		authHandler.RegisterRoutes(v1, rateLimiter, cfg.JWTSecret)
 	}
 
