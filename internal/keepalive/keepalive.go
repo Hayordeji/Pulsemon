@@ -18,7 +18,7 @@ type KeepAlive struct {
 func NewKeepAlive(cfg config.Config) *KeepAlive {
 	return &KeepAlive{
 		url:      cfg.AppBaseURL + "/api/v1/health",
-		interval: 12 * time.Minute,
+		interval: 5 * time.Minute,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},

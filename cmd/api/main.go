@@ -195,7 +195,7 @@ func main() {
 	host = strings.TrimPrefix(host, "http://")
 
 	//Setup Swagger
-	if cfg.AppEnv != "production" {
+	if cfg.AppEnv == "development" {
 		docs.SwaggerInfo.Host = host
 		docs.SwaggerInfo.BasePath = "/api/v1"
 		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
