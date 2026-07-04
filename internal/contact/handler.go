@@ -24,7 +24,16 @@ type ContactRequest struct {
 	Message  string `json:"message"`
 }
 
-// NewContactHandler creates a ContactHandler.
+// NewContactHandler handles POST /contact.
+// @Summary      Send contact email
+// @Description  Sends a message to team
+// @Tags         contact
+// @Produce      json
+// @Param		body body ContactRequest true "Contact Team"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      401  {object}  map[string]interface{}
+// @Failure      409  {object}  map[string]interface{}
+// @Router       /contact [post]
 func NewContactHandler(apiKey, fromEmail, toEmail string) *ContactHandler {
 	return &ContactHandler{
 		client:    resend.NewClient(apiKey),

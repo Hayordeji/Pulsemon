@@ -428,7 +428,7 @@ func (s *AuthService) ForgotPassword(ctx context.Context, input ForgotPasswordIn
 }
 
 func (s *AuthService) sendPasswordResetEmail(username string, email string, userID string, token string) {
-	url := fmt.Sprintf("%s/api/v1/auth/reset-password?token=%s&user_id=%s", s.cfg.AppBaseURL, token, userID)
+	url := fmt.Sprintf("%s/auth/reset-password?token=%s&user_id=%s", s.cfg.AppBaseURL, token, userID)
 
 	// body := fmt.Sprintf("You requested a password reset for your Pulsemon account.\n\n"+
 	// 	"Click the link below to reset your password:\n"+

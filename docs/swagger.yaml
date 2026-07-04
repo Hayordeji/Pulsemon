@@ -52,6 +52,15 @@ definitions:
       userID:
         type: string
     type: object
+  contact.ContactRequest:
+    properties:
+      email:
+        type: string
+      full_name:
+        type: string
+      message:
+        type: string
+    type: object
   dashboard.AlertResponse:
     properties:
       alert_type:
@@ -574,6 +583,37 @@ paths:
       summary: Verify user email
       tags:
       - auth
+  /contact:
+    post:
+      description: Sends a message to team
+      parameters:
+      - description: Contact Team
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/contact.ContactRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Send contact email
+      tags:
+      - contact
   /dashboard/{service_id}:
     get:
       description: Returns full health overview including latency, SLA, SSL and recent
