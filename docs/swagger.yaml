@@ -5,6 +5,11 @@ definitions:
       email:
         type: string
     type: object
+  auth.GoogleLoginRequest:
+    properties:
+      id_token:
+        type: string
+    type: object
   auth.LoginInput:
     properties:
       email:
@@ -372,6 +377,45 @@ paths:
             additionalProperties: true
             type: object
       summary: Request password reset
+      tags:
+      - auth
+  /auth/google:
+    post:
+      consumes:
+      - application/json
+      description: Verifies a Google ID token from Google Identity Services and logs
+        in the user, creating the account on first sign-in
+      parameters:
+      - description: Google ID token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.GoogleLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Google sign-in
       tags:
       - auth
   /auth/login:

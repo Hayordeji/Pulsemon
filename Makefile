@@ -3,7 +3,7 @@ export
 
 DB_URL=postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSL_MODE)
 
-.PHONY: migrate-up migrate-down migrate-create migrate-version migrate-force run build tidy
+.PHONY: migrate-up migrate-down migrate-create migrate-version migrate-force run build tidy swagger
 
 migrate-up:
 	migrate -path migrations -database "$(DB_URL)" up
@@ -30,3 +30,6 @@ build:
 
 tidy:
 	go mod tidy
+
+swagger:
+	swag init -g cmd/api/main.go -o docs

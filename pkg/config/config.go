@@ -29,6 +29,7 @@ type Config struct {
 	AdminUsername   string
 	AppBaseURL      string
 	DBSSLMode       string
+	GoogleClientID  string
 }
 
 func Load() Config {
@@ -65,6 +66,7 @@ func Load() Config {
 		AdminUsername:   os.Getenv("ADMIN_USERNAME"),
 		AppBaseURL:      os.Getenv("APP_BASE_URL"),
 		DBSSLMode:       os.Getenv("DB_SSL_MODE"),
+		GoogleClientID:  os.Getenv("GOOGLE_CLIENT_ID"),
 	}
 }
 
@@ -84,6 +86,7 @@ func (c Config) Validate() error {
 		"SERVER_PORT":       c.ServerPort,
 		"ALLOWED_ORIGINS":   c.AllowedOrigins,
 		"APP_BASE_URL":      c.AppBaseURL,
+		"GOOGLE_CLIENT_ID":  c.GoogleClientID,
 	}
 
 	if c.DBSSLMode == "" {

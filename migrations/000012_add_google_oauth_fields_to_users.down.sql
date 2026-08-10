@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS uq_users_google_id;
+ALTER TABLE users DROP COLUMN IF EXISTS google_id;
+ALTER TABLE users DROP COLUMN IF EXISTS provider;
