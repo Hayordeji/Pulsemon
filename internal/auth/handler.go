@@ -5,6 +5,7 @@ import (
 	"Pulsemon/pkg/models"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,6 +24,7 @@ func NewAuthHandler(svc *AuthService) *AuthHandler {
 func (h *AuthHandler) RegisterRoutes(router *gin.RouterGroup, rateLimiter *middleware.RateLimiter, jwtSecret string) {
 	router.POST("/auth/register", rateLimiter.AuthStrict(), h.Register)
 	router.POST("/auth/login", rateLimiter.AuthStrict(), h.Login)
+	router.POST("/auth/google", rateLimiter.AuthStrict(), h.GoogleLogin)
 	router.GET("/auth/verify", rateLimiter.AuthStrict(), h.VerifyEmail)
 	router.POST("/auth/resend-verify", rateLimiter.Global(), h.ResendVerification)
 	router.POST("/auth/forgot-password", h.ForgotPassword)
@@ -135,6 +137,69 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	res.Data = gin.H{
 		"jwt":           tokenPair.JWT,
 		"refresh_token": tokenPair.RefreshToken,
+	}
+	c.JSON(http.StatusOK, res)
+}
+
+// GoogleLoginRequest holds the Google ID token ("credential" from the Google
+// Identity Services JS SDK) for a Google sign-in attempt.
+type GoogleLoginRequest struct {
+	IDToken string `json:"id_token"`
+}
+
+// GoogleLogin handles POST /api/v1/auth/google.
+// @Summary      Google sign-in
+// @Description  Verifies a Google ID token from Google Identity Services and logs in the user, creating the account on first sign-in
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body body GoogleLoginRequest true "Google ID token"
+// @Success      200  {object}  map[string]interface{}
+// @Failure      400  {object}  map[string]interface{}
+// @Failure      401  {object}  map[string]interface{}
+// @Failure      409  {object}  map[string]interface{}
+// @Router       /auth/google [post]
+func (h *AuthHandler) GoogleLogin(c *gin.Context) {
+	var req GoogleLoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.IDToken) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	res := models.ApiResponse{
+		Message: "Google sign-in failed",
+		Success: false,
+		Error:   "",
+		Data:    nil,
+	}
+
+	result, err := h.svc.GoogleLogin(c.Request.Context(), GoogleLoginInput{IDToken: req.IDToken})
+	if err != nil {
+		if errors.Is(err, ErrInvalidGoogleToken) {
+			res.Error = err.Error()
+			c.JSON(http.StatusBadRequest, res)
+			return
+		}
+		if errors.Is(err, ErrGoogleEmailUnverified) {
+			res.Error = err.Error()
+			c.JSON(http.StatusUnauthorized, res)
+			return
+		}
+		if errors.Is(err, ErrGoogleAccountConflict) {
+			res.Error = err.Error()
+			c.JSON(http.StatusConflict, res)
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		return
+	}
+
+	res.Success = true
+	res.Message = "Google sign-in successful"
+	res.Data = gin.H{
+		"jwt":           result.JWT,
+		"refresh_token": result.RefreshToken,
+		"is_new_user":   result.IsNewUser,
 	}
 	c.JSON(http.StatusOK, res)
 }

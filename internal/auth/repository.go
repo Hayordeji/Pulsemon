@@ -28,19 +28,45 @@ type CreateUserInput struct {
 	PasswordHash string
 	RoleID       uuid.UUID
 	Username     string
+	GoogleID     *string // nil = email/password account
+	Provider     string  // "email" (default) or "google"
+	IsVerified   bool
 }
 
 // CreateUser inserts a new user into the database.
 func (r *AuthRepository) CreateUser(input CreateUserInput) error {
+	provider := input.Provider
+	if provider == "" {
+		provider = "email"
+	}
+
 	user := models.User{
 		ID:           input.ID,
 		Email:        input.Email,
 		PasswordHash: input.PasswordHash,
 		RoleID:       input.RoleID,
 		Username:     input.Username,
+		GoogleID:     input.GoogleID,
+		Provider:     provider,
+		IsVerified:   input.IsVerified,
 	}
 
 	return r.db.Create(&user).Error
+}
+
+// SetGoogleIDInput holds data to link a Google account to a user.
+type SetGoogleIDInput struct {
+	UserID   string
+	GoogleID string
+}
+
+// SetGoogleID links a Google account (its stable subject id) to an existing user.
+func (r *AuthRepository) SetGoogleID(input SetGoogleIDInput) error {
+	return r.db.Model(&models.User{}).
+		Where("id = ?", input.UserID).
+		Updates(map[string]interface{}{
+			"google_id": input.GoogleID,
+		}).Error
 }
 
 // FindUserByEmailInput holds data for finding a user.
@@ -197,11 +223,14 @@ type UpdatePasswordInput struct {
 }
 
 // UpdatePassword updates a user's password and clears the verification token.
+// The provider is flipped to "email": the account now has a usable password.
+// Google login keeps working afterwards since google_id is left untouched.
 func (r *AuthRepository) UpdatePassword(input UpdatePasswordInput) error {
 	return r.db.Model(&models.User{}).
 		Where("id = ?", input.UserID).
 		Updates(map[string]interface{}{
 			"password_hash":      input.PasswordHash,
+			"provider":           "email",
 			"verification_token": gorm.Expr("NULL"),
 			"token_expires_at":   gorm.Expr("NULL"),
 		}).Error

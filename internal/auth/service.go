@@ -5,16 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
 	"Pulsemon/pkg/config"
+	"Pulsemon/pkg/models"
 	"Pulsemon/pkg/roles"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/resendlabs/resend-go"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/api/idtoken"
 )
 
 var (
@@ -29,24 +33,46 @@ var (
 	ErrInvalidRefreshToken        = errors.New("invalid or expired refresh token")
 	ErrUsernameTaken              = errors.New("username is already taken")
 	ErrInvalidUsername            = errors.New("username must be between 3 and 50 characters")
+	ErrInvalidGoogleToken         = errors.New("invalid Google sign-in token")
+	ErrGoogleEmailUnverified      = errors.New("Google email is not verified")
+	ErrGoogleAccountConflict      = errors.New("a different Google account is already linked to this email")
+	ErrPasswordLoginNotAllowed    = errors.New("this account uses Google sign-in — sign in with Google instead")
 )
 
+// googlePasswordSentinel is stored as password_hash for Google-created accounts.
+// It is not a valid bcrypt hash, so it can never authenticate a password login
+// — even if a future code path forgets the provider check, bcrypt fails closed.
+const googlePasswordSentinel = "!"
+
 type AuthService struct {
-	repo      *AuthRepository
-	jwtSecret string
-	roles     *roles.RoleRegistry
-	cfg       config.Config
-	resend    *resend.Client
+	repo            *AuthRepository
+	jwtSecret       string
+	roles           *roles.RoleRegistry
+	cfg             config.Config
+	resend          *resend.Client
+	googleValidator *idtoken.Validator
 }
 
 func NewAuthService(repo *AuthRepository, cfg config.Config, registry *roles.RoleRegistry) *AuthService {
-	return &AuthService{
+	svc := &AuthService{
 		repo:      repo,
 		jwtSecret: cfg.JWTSecret,
 		roles:     registry,
 		cfg:       cfg,
 		resend:    resend.NewClient(cfg.ResendAPIKey),
 	}
+
+	// The Google validator caches the JWKS (public keys), so it must be
+	// created once here, not per request. The audience is passed per call.
+	validator, err := idtoken.NewValidator(context.Background())
+	if err != nil {
+		slog.Error("failed to create Google ID-token validator",
+			"error", err)
+	} else {
+		svc.googleValidator = validator
+	}
+
+	return svc
 }
 
 type RegisterInput struct {
@@ -140,11 +166,24 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*TokenPair, 
 		return nil, ErrUserIsNotVerified
 	}
 
+	// Google-created accounts have no password — direct them to Google sign-in
+	// instead of failing bcrypt against the sentinel hash.
+	if user.Provider == "google" {
+		return nil, ErrPasswordLoginNotAllowed
+	}
+
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password))
 	if err != nil {
 		return nil, ErrInvalidCredentials
 	}
 
+	slog.Info("user logged in successfully", "email", input.Email)
+
+	return s.issueTokens(user)
+}
+
+// signAccessToken builds and signs the access JWT with the standard claims.
+func (s *AuthService) signAccessToken(user *models.User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"userID": user.ID.String(),
 		"email":  user.Email,
@@ -153,7 +192,14 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*TokenPair, 
 		"iat":    time.Now().Unix(),
 	})
 
-	tokenString, err := token.SignedString([]byte(s.jwtSecret))
+	return token.SignedString([]byte(s.jwtSecret))
+}
+
+// issueTokens signs a fresh access JWT and stores a new opaque refresh token
+// (7-day expiry). A failed refresh-token write is logged and tolerated — the
+// access token alone is still returned.
+func (s *AuthService) issueTokens(user *models.User) (*TokenPair, error) {
+	tokenString, err := s.signAccessToken(user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign token: %w", err)
 	}
@@ -172,8 +218,6 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*TokenPair, 
 			"error", err)
 		refreshToken = ""
 	}
-
-	slog.Info("user logged in successfully", "email", input.Email)
 
 	return &TokenPair{
 		JWT:          tokenString,
@@ -196,15 +240,7 @@ func (s *AuthService) Refresh(ctx context.Context, input RefreshInput) (*TokenPa
 		return nil, ErrInvalidRefreshToken
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"userID": user.ID.String(),
-		"email":  user.Email,
-		"roleID": user.RoleID.String(),
-		"exp":    time.Now().Add(24 * time.Hour).Unix(),
-		"iat":    time.Now().Unix(),
-	})
-
-	newJWTToken, err := token.SignedString([]byte(s.jwtSecret))
+	newJWTToken, err := s.signAccessToken(user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign token: %w", err)
 	}
@@ -227,6 +263,226 @@ func (s *AuthService) Refresh(ctx context.Context, input RefreshInput) (*TokenPa
 		JWT:          newJWTToken,
 		RefreshToken: newRefreshToken,
 	}, nil
+}
+
+// GoogleLoginInput holds data for a Google sign-in attempt.
+type GoogleLoginInput struct {
+	IDToken string
+}
+
+// GoogleLoginResult is returned on a successful Google sign-in.
+type GoogleLoginResult struct {
+	JWT          string
+	RefreshToken string
+	IsNewUser    bool
+}
+
+// GoogleLogin verifies a Google ID token (obtained by the frontend via Google
+// Identity Services) and either creates a new user on first sign-in, or links
+// the Google identity to an existing email account and logs it in.
+func (s *AuthService) GoogleLogin(ctx context.Context, input GoogleLoginInput) (*GoogleLoginResult, error) {
+	if s.googleValidator == nil {
+		return nil, fmt.Errorf("google sign-in is not configured")
+	}
+
+	payload, err := s.googleValidator.Validate(ctx, input.IDToken, s.cfg.GoogleClientID)
+	if err != nil {
+		// Cert-fetch errors mean Google's JWKS endpoint failed (infrastructure);
+		// every other idtoken error is a bad client token.
+		if strings.Contains(err.Error(), "unable to retrieve cert") ||
+			strings.Contains(err.Error(), "cert response is nil") {
+			return nil, fmt.Errorf("failed to verify Google token: %w", err)
+		}
+		return nil, ErrInvalidGoogleToken
+	}
+
+	// The library does not check the issuer — enforce it here (defense in depth).
+	if payload.Issuer != "accounts.google.com" && payload.Issuer != "https://accounts.google.com" {
+		return nil, ErrInvalidGoogleToken
+	}
+
+	// When present, the authorized-presenter claim must be our client.
+	if azp, ok := payload.Claims["azp"].(string); ok && azp != s.cfg.GoogleClientID {
+		return nil, ErrInvalidGoogleToken
+	}
+
+	// Google-verified email is the gate for both account creation and linking —
+	// it prevents hijacking a password account with an unverified email claim.
+	email, _ := payload.Claims["email"].(string)
+	emailVerified, _ := payload.Claims["email_verified"].(bool)
+	if email == "" || !emailVerified {
+		return nil, ErrGoogleEmailUnverified
+	}
+	sub := payload.Subject
+	if sub == "" {
+		return nil, ErrInvalidGoogleToken
+	}
+	email = strings.ToLower(email)
+
+	user, err := s.repo.FindUserByEmail(FindUserByEmailInput{Email: email})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch user: %w", err)
+	}
+
+	isNewUser := false
+	if user == nil {
+		user, isNewUser, err = s.registerGoogleUser(email, sub, payload.Claims)
+		if err != nil {
+			return nil, err
+		}
+	} else if user.GoogleID != nil {
+		if *user.GoogleID != sub {
+			// Same email, different Google account — refuse the link.
+			return nil, ErrGoogleAccountConflict
+		}
+	} else {
+		// Auto-link: Google asserts the email is verified, which is stronger
+		// than the email-link check — attaching the identity is safe.
+		if err := s.repo.SetGoogleID(SetGoogleIDInput{UserID: user.ID.String(), GoogleID: sub}); err != nil {
+			return nil, fmt.Errorf("failed to link Google account: %w", err)
+		}
+		if !user.IsVerified {
+			// Promote: Google's check proves email ownership, which unblocks
+			// the VerifiedMiddleware on protected routes.
+			if err := s.repo.SetVerified(SetVerifiedInput{UserID: user.ID.String()}); err != nil {
+				return nil, fmt.Errorf("failed to verify user: %w", err)
+			}
+			user.IsVerified = true
+		}
+	}
+
+	tokenPair, err := s.issueTokens(user)
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Info("user signed in with Google",
+		"user_id", user.ID.String(),
+		"is_new_user", isNewUser)
+
+	return &GoogleLoginResult{
+		JWT:          tokenPair.JWT,
+		RefreshToken: tokenPair.RefreshToken,
+		IsNewUser:    isNewUser,
+	}, nil
+}
+
+// registerGoogleUser creates a new user from a verified Google profile.
+// Returns the created user with isNew=true, or an existing user with
+// isNew=false if a concurrent registration won the email race.
+func (s *AuthService) registerGoogleUser(email, sub string, claims map[string]interface{}) (*models.User, bool, error) {
+	for attempt := 0; attempt < 3; attempt++ {
+		userID := uuid.New()
+		username := s.buildUsername(claims, email)
+
+		err := s.repo.CreateUser(CreateUserInput{
+			ID:           userID,
+			Email:        email,
+			PasswordHash: googlePasswordSentinel,
+			RoleID:       s.roles.UserRoleID,
+			Username:     username,
+			GoogleID:     &sub,
+			Provider:     "google",
+			IsVerified:   true, // Google verified the email — skip the email-link check
+		})
+		if err == nil {
+			return &models.User{
+				ID:           userID,
+				Email:        email,
+				PasswordHash: googlePasswordSentinel,
+				Username:     username,
+				RoleID:       s.roles.UserRoleID,
+				IsVerified:   true,
+				Provider:     "google",
+				GoogleID:     &sub,
+			}, true, nil
+		}
+		if !isUniqueViolation(err) {
+			return nil, false, fmt.Errorf("failed to create user: %w", err)
+		}
+
+		// Unique violation — either the username or the email lost a race.
+		existing, ferr := s.repo.FindUserByEmail(FindUserByEmailInput{Email: email})
+		if ferr != nil {
+			return nil, false, fmt.Errorf("failed to re-check existing user: %w", ferr)
+		}
+		if existing != nil {
+			// Email race: another registration won — fall into the link path.
+			return existing, false, nil
+		}
+		// Username race: loop regenerates a fresh candidate.
+	}
+
+	return nil, false, fmt.Errorf("failed to create user after retries")
+}
+
+// buildUsername derives a unique username from the Google profile name,
+// falling back to the email local-part, then "user". The result is lowercased,
+// capped at 50 characters (DB limit), and guaranteed free by suffixing a
+// counter while FindUserByName reports the candidate as taken.
+func (s *AuthService) buildUsername(claims map[string]interface{}, email string) string {
+	raw := ""
+	if given, ok := claims["given_name"].(string); ok {
+		raw = given
+	}
+	if family, ok := claims["family_name"].(string); ok {
+		if raw != "" {
+			raw += " "
+		}
+		raw += family
+	}
+	if strings.TrimSpace(raw) == "" {
+		if name, ok := claims["name"].(string); ok {
+			raw = name
+		}
+	}
+
+	base := sanitizeUsername(raw)
+	if base == "" {
+		base = sanitizeUsername(strings.SplitN(email, "@", 2)[0])
+	}
+	if base == "" {
+		base = "user"
+	}
+	base = truncateUsername(strings.ToLower(base))
+
+	candidate := base
+	for i := 1; i <= 50; i++ {
+		existing, _ := s.repo.FindUserByName(candidate) // insert will surface conflicts
+		if existing == nil {
+			return candidate
+		}
+		candidate = truncateUsername(base + strconv.Itoa(i))
+	}
+	return truncateUsername(base + "_" + uuid.NewString()[:6])
+}
+
+// sanitizeUsername keeps only the characters the username validation allows
+// (letters, numbers, underscores, hyphens).
+func sanitizeUsername(raw string) string {
+	var b strings.Builder
+	for _, c := range raw {
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') || c == '_' || c == '-' {
+			b.WriteRune(c)
+		}
+	}
+	return b.String()
+}
+
+// truncateUsername caps a username candidate at the DB's 50-character limit.
+func truncateUsername(s string) string {
+	if len(s) > 50 {
+		return s[:50]
+	}
+	return s
+}
+
+// isUniqueViolation reports whether err is a Postgres unique constraint
+// violation (SQLSTATE 23505).
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // UpdateUsernameInput holds data for updating a user's username.

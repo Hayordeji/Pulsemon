@@ -9,8 +9,12 @@ import (
 
 // User represents a registered user of the system.
 type User struct {
-	ID                 uuid.UUID  `gorm:"type:uuid;primaryKey;column:id"`
-	Email              string     `gorm:"type:varchar(255);uniqueIndex;not null;column:email"`
+	ID    uuid.UUID `gorm:"type:uuid;primaryKey;column:id"`
+	Email string    `gorm:"type:varchar(255);uniqueIndex;not null;column:email"`
+	// PasswordHash is the bcrypt hash of the user's password. Google-created
+	// accounts have no password and store the sentinel "!" (never a valid
+	// bcrypt hash); the login flow rejects provider "google" accounts before
+	// bcrypt ever sees it, so the sentinel fails closed if a check is missed.
 	PasswordHash       string     `gorm:"type:varchar(255);not null;column:password_hash"`
 	Username           string     `gorm:"type:varchar(255);not null;column:username"`
 	RoleID             uuid.UUID  `gorm:"type:uuid;not null" json:"role_id"`
@@ -21,6 +25,11 @@ type User struct {
 	TokenExpiresAt     *time.Time `gorm:"column:token_expires_at" json:"-"`
 	RefreshToken       *string    `gorm:"column:refresh_token" json:"-"`
 	RefreshTokenExpiry *time.Time `gorm:"column:refresh_token_expiry" json:"-"`
+	// Provider is how the account was created: "email" (password) or "google".
+	Provider string `gorm:"type:varchar(50);not null;default:email;column:provider" json:"provider"`
+	// GoogleID is Google's stable subject identifier (sub) once a Google
+	// account is created or linked; NULL for pure password accounts.
+	GoogleID *string `gorm:"type:varchar(255);column:google_id" json:"-"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {
